@@ -40,7 +40,11 @@ class FinalItineraryRequest(BaseModel):
     city: str               
     transport: str = "自駕" 
 
-
+# --- 7/3 新增的微調修改 ---
+class ModifyItineraryRequest(BaseModel):
+    current_itinerary: str
+    modification_demand: str
+# -------------------------
 @app.post("/api/v1/recommend-spots")
 def api_recommend_spots(req: RecommendRequest):
     user_need = (
@@ -85,3 +89,18 @@ async def generate_final(req: FinalItineraryRequest):
         transport=req.transport  
     )
     return {"result": result}
+# --- 7/3 新增的微調修改 ---
+@app.post("/api/v1/modify-itinerary")
+def api_modify_itinerary(req: ModifyItineraryRequest):
+    try:
+        updated_itinerary = engine.modify_itinerary(
+            current_itinerary=req.current_itinerary,
+            modification_demand=req.modification_demand
+        )
+        return {
+            "status": "success",
+            "result": updated_itinerary
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"修改行程異常: {str(e)}")
+    #----------------------

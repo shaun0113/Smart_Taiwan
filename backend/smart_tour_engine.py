@@ -158,7 +158,7 @@ class SmartTourEngine:
            - 根據使用者新要求，智慧地調整並彙整想去的景點清單。
 
         【輸出規範】
-        你必須「完全只輸出」一個標準的 JSON 字串，不得包含任何 Markdown 標籤或額外敘述。
+        你必須「完全只輸出」一個標準的 JSON 字串，不得包含任何 Markdown 標籤 or 額外敘述。
         格式範例 :
         {{"status": "CONTINUE", "accumulated_spots": "景點A + 景點B", "msg": "訊息內容"}}
         """
@@ -219,7 +219,7 @@ class SmartTourEngine:
             【旅客基本需求】
             {user_need}
 
-            【旅客最終選定想去的景點與微調意見】
+            【旅客最終選定想去的景點與微裝意見】
             {spots_context}
 
             請輸出語氣貼心、格式極度留白、完全符合上方格式範例的最終智慧行程表。
@@ -231,3 +231,39 @@ class SmartTourEngine:
         except Exception as e:
             logger.error(f"最終行程生成引擎發生異常: {str(e)}")
             return f"最終行程生成引擎發生異常: {str(e)}，請重新觸發生成。"
+
+    # --- 新增的行程表微調修改核心邏輯方法 ---
+    def modify_itinerary(self, current_itinerary: str, modification_demand: str) -> str:
+        """【行程微調修改】依據使用者修改需求局部覆蓋現有行程，嚴格維持排版規範 """
+        if not self.client:
+            return "Gemini API 尚未正確初始化。"
+
+        try:
+            prompt = f"""
+            你現在是台灣頂級智慧旅遊規劃師。請根據使用者最新提出的「修改需求」，對「現有的行程表」進行局部的調整、替換或覆蓋。
+
+            【核心微調與排版行為約束】
+            1. 必須嚴格保留現有行程表的大部分架構、天數分配與景點。
+            2. 僅針對使用者指定的部分（如特定的天數、特定的景點或希望速度放慢等）進行精確微調或替換。
+            3. 修改後的輸出排版，必須與原先的格式完全一致，嚴格遵循「分行格式」與「多層次段落空行」換行。
+            4. 嚴禁輸出任何 <br> 標籤、|| 符號、或 Markdown 表格欄位。
+            5. 直接輸出修改完成後的完整全新行程表，不要帶有任何開頭或結尾的寒暄廢話。
+
+            【現有的行程表】：
+            {current_itinerary}
+
+            【使用者的修改需求】：
+            {modification_demand}
+
+            請輸出修改完成後符合範例高規格留白樣式的最終智慧行程表：
+            """
+            
+            logger.info("🤖 正在處理最後一頁行程表局部微調需求...")
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
+            return response.text if response.text else "微調行程失敗，請重試。"
+        except Exception as e:
+            logger.error(f"行程修改功能發生異常: {str(e)}")
+            return f"行程修改發生異常: {str(e)}，請稍後再試。"

@@ -20,8 +20,13 @@ export const Dashboard = () => {
   const [apiMsg, setApiMsg] = useState(''); 
   const [userChoice, setUserChoice] = useState('');
   const [finalItinerary, setFinalItinerary] = useState('');
+  
+  // 新增一個控制複製成功提示的狀態
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const resultEndRef = useRef(null);
+  // 新增一個指向行程表區塊的 Ref，方便列印功能精確定位
+  const itineraryRef = useRef(null);
 
   const scrollToBottom = () => {
     resultEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -79,7 +84,6 @@ export const Dashboard = () => {
       const data = await res.json();
 
       if (res.ok && data) {
-        // 精確對齊後端 FastAPI 回傳的 JSON 欄位名稱
         setUserNeed(data.user_need || `預計行程天數：${formData.days}天`);
         setSpotsRecommendation(data.spots_recommendation || "");
         setAccumulatedSpots(data.accumulated_spots || "");
@@ -132,7 +136,7 @@ export const Dashboard = () => {
       }
     } catch (error) {
       console.error(error);
-      setErrorMsg("微調意見發送失敗，請檢查後端連線。");
+      setErrorMsg("微調意見發送失敗，請檢查後端連線. ");
     } finally {
       setLoading(false);
     }
@@ -170,6 +174,68 @@ export const Dashboard = () => {
       setLoading(false);
     }
   };
+
+  // ==================== 7/3 最終行程表微調修改功能 ====================
+  const handleModifyItinerary = async (e) => {
+    if (e) e.preventDefault();
+    if (!userChoice.trim() || loading) return;
+
+    try {
+      setLoading(true);
+      setErrorMsg("");
+
+      const res = await fetch('http://127.0.0.1:8000/api/v1/modify-itinerary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current_itinerary: finalItinerary,
+          modification_demand: userChoice
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data && data.status === "success") {
+        setFinalItinerary(data.result);
+        setUserChoice(""); 
+      } else {
+        setErrorMsg(`微調行程失敗：${data.detail || JSON.stringify(data)}`);
+      }
+    } catch (error) {
+      console.error(error);
+      setErrorMsg("行程表微調請求失敗，請確認後端 Python 服務是否正常。");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopyToClipboard = () => {
+    if (!finalItinerary) return;
+    navigator.clipboard.writeText(finalItinerary)
+      .then(() => {
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000); 
+      })
+      .catch((err) => console.error('無法複製行程: ', err));
+  };
+
+  const handlePrintPDF = () => {
+    if (!itineraryRef.current) return;
+    
+    const printContent = itineraryRef.current.innerHTML;
+    const originalContent = document.body.innerHTML;
+    
+    document.body.innerHTML = `
+      <div style="padding: 40px; font-family: sans-serif; max-width: 800px; margin: 0 auto;">
+        ${printContent}
+      </div>
+    `;
+    window.print();
+    
+    document.body.innerHTML = originalContent;
+    window.location.reload(); 
+  };
+  //-------------------------------------------------------
 
   // ==================== UI 畫面渲染 ====================
   return (
@@ -224,12 +290,13 @@ export const Dashboard = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col">
+            {/* 行程規劃表區塊 - 綁定 Ref 列印用 */}
+            <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
                 <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
                   智遊台灣 專屬旅遊行程規劃表
                 </h2>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
                     {formData.days} 天 {formData.group_size} ({formData.transport})
                   </span>
@@ -239,6 +306,22 @@ export const Dashboard = () => {
                     </span>
                   ))}
                 </div>
+              </div>
+      
+              {/* 新增：匯出功能工具列 */}
+              <div className="mb-4 flex gap-2 justify-end no-print">
+                <button 
+                  onClick={handleCopyToClipboard}
+                  className="px-4 py-2 text-xs font-bold rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-1.5 shadow-sm"
+                >
+                  {copySuccess ? " 已複製到剪貼簿" : " 複製文字行程"}
+                </button>
+                <button 
+                  onClick={handlePrintPDF}
+                  className="px-4 py-2 text-xs font-bold rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-all flex items-center gap-1.5 shadow-sm"
+                >
+                   匯出 PDF / 列印
+                </button>
               </div>
 
               <div className="bg-slate-50/70 rounded-xl p-8 border border-slate-100 min-h-[450px] text-slate-700 tracking-wide">
@@ -266,15 +349,15 @@ export const Dashboard = () => {
                 )}
               </div>
 
-              <div className="mt-6 border-t border-slate-100 pt-5">
-                <h3 className="text-sm font-bold text-slate-800 mb-2">🎯 對行程不滿意？告訴 AI 你想修改哪裡：</h3>
-                <form onSubmit={handleAnalyzeSelection} className="flex gap-2">
+              <div className="mt-6 border-t border-slate-100 pt-5 no-print">
+                <h3 className="text-sm font-bold text-slate-800 mb-2"> 對行程不滿意？你想修改哪裡：</h3>
+                <form onSubmit={handleModifyItinerary} className="flex gap-2">
                   <input 
                     type="text" 
                     value={userChoice}
                     onChange={(e) => setUserChoice(e.target.value)}
                     disabled={loading} 
-                    placeholder={loading ? "AI 正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排鬆一點..."}
+                    placeholder={loading ? "正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排鬆一點..."}
                     className="flex-1 text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner"
                   />
                   <button 
@@ -289,7 +372,6 @@ export const Dashboard = () => {
             </div>
           </div>
         ) : (
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
               {step === 0 && (
