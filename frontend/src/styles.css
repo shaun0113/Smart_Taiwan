@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 🚨 終極強制白底：徹底幹掉原先寫死在最外層的深色背景 🚨 */
+html, 
+body, 
+#root, 
+#root > div {
+  background-color: #f8fafc !important; /* 強制灰白底 */
+  color: #1e293b !important;            /* 強制深色字 */
+}
+
+/* 確保容器可以正常展開成左右雙欄（防止被舊樣式限制寬度） */
+.max-w-6xl {
+  max-w: 72rem !important;
+  width: 100% !important;
+}
+
+/* 確保按鈕跟進度條等 emerald 綠色不會被上面全域刷白給抹煞 */
+.bg-emerald-500 {
+  background-color: #10b981 !important;
+}
+.bg-emerald-600 {
+  background-color: #059669 !important;
+}
+.text-emerald-600 {
+  color: #059669 !important;
+}
