@@ -245,9 +245,13 @@ export const Dashboard = () => {
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
       <header className="border-b bg-white shadow-sm">
         <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-emerald-600 tracking-wide flex items-center gap-2">
-            智遊台灣 Smart Tour
-          </h1>
+        <h1 
+          className="text-2xl font-bold text-gray-800" 
+          onClick={() => setStep(1)} 
+          style={{ cursor: 'pointer' }}
+        >
+          智遊台灣 Smart Tour
+        </h1>
           <span className="text-xs text-slate-500 font-medium">
             資管系畢業專題 – 國內智慧旅遊決策支援系統
           </span>
