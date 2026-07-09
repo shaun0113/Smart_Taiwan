@@ -34,17 +34,21 @@ class AnalyzeRequest(BaseModel):
     accumulated_spots: str
     user_need: str
 
+# --- 7/9 新增可以設定出發地 ---
 class FinalItineraryRequest(BaseModel):
     accumulated_spots: str
     user_need: str
-    city: str               
+    city: str              
     transport: str = "自駕" 
+    start_location: str = "臺北市" 
+    start_time: str = "08:00"     
 
 # --- 7/3 新增的微調修改 ---
 class ModifyItineraryRequest(BaseModel):
     current_itinerary: str
     modification_demand: str
 # -------------------------
+
 @app.post("/api/v1/recommend-spots")
 def api_recommend_spots(req: RecommendRequest):
     user_need = (
@@ -82,13 +86,19 @@ def api_analyze_selection(req: AnalyzeRequest):
 
 @app.post("/api/v1/generate-final")
 async def generate_final(req: FinalItineraryRequest):
-    result = engine.generate_final_itinerary(
-        accumulated_spots=req.accumulated_spots,
-        user_need=req.user_need,
-        city=req.city,         
-        transport=req.transport  
-    )
-    return {"result": result}
+    try:
+        result = engine.generate_final_itinerary(
+            accumulated_spots=req.accumulated_spots,
+            user_need=req.user_need,
+            city=req.city,         
+            transport=req.transport,
+            start_location=req.start_location, 
+            start_time=req.start_time        
+        )
+        return {"result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"生成最終行程表異常: {str(e)}")
+
 # --- 7/3 新增的微調修改 ---
 @app.post("/api/v1/modify-itinerary")
 def api_modify_itinerary(req: ModifyItineraryRequest):
@@ -103,4 +113,4 @@ def api_modify_itinerary(req: ModifyItineraryRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"修改行程異常: {str(e)}")
-    #----------------------
+# -------------------------

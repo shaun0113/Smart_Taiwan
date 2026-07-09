@@ -142,7 +142,7 @@ export const Dashboard = () => {
     }
   };
 
-  // ==================== 3. 終極排程 (對齊 Render 雲端後端) ====================
+  // ==================== 3. 排程 (對齊 Render 雲端後端) ====================
   const handleGenerateFinal = async (targetSpots = null) => {
     try {
       setLoading(true);
@@ -155,7 +155,10 @@ export const Dashboard = () => {
           accumulated_spots: targetSpots || accumulatedSpots, 
           user_need: userNeed || `預計行程天數：${formData.days}天`, 
           city: formData.cities.join(','),       
-          transport: formData.transport || '自駕' 
+          transport: formData.transport || '自駕',
+          // 可以自己改成其他測試縣市與時間
+          start_location: formData.start_location || '臺北市',
+          start_time: formData.start_time || '08:00'
         })
       });
 
@@ -175,7 +178,7 @@ export const Dashboard = () => {
     }
   };
 
-  // ==================== 4. 最終行程表微調修改功能 (對齊 Render 雲端後端) ====================
+  // ==================== 4. 最終行程表微調修改功能 ====================
   const handleModifyItinerary = async (e) => {
     if (e) e.preventDefault();
     if (!userChoice.trim() || loading) return;
