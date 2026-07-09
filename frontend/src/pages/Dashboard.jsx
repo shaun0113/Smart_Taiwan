@@ -446,28 +446,43 @@ export const Dashboard = () => {
               )}
 
               {step === 2 && (
-                <div className="flex-1 flex flex-col justify-between">
-                  <div>
-                    <h2 className="text-base font-bold text-slate-900 mb-1">第三步：成員設定</h2>
-                    <div className="flex flex-col gap-2 my-2">
-                      {['獨旅', '2-4人', '5人以上小團體'].map(size => (
-                        <button
-                          key={size}
-                          onClick={() => setFormData({ ...formData, group_size: size })}
-                          className={`py-3 text-left px-4 rounded-xl text-xs font-semibold border transition-all
-                            ${formData.group_size === size ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
-                        >
-                          {size}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex justify-between mt-6">
-                    <button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
-                    <button onClick={handleRecommendSpots} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">開始海選景點！</button>
-                  </div>
+               <div className="flex-1 flex flex-col justify-between">
+                 <div>
+                   <h2 className="text-base font-bold text-slate-900 mb-1">第三步：成員設定</h2>
+                   <p className="text-xs text-slate-500 mb-4">請輸入本次旅遊的人數或成員結構（例如：3人、獨旅、5人公司出遊）</p>
+                   
+                   <div className="mt-2">
+                     <input
+                       type="text"
+                       placeholder="例如：2-4人、獨旅、家族旅遊10人..."
+                       value={formData.group_size || ''}
+                       onChange={(e) => setFormData({ ...formData, group_size: e.target.value })}
+                       className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner"
+                       autoFocus
+                     />
+                   </div>
+                 </div>
+            
+                <div className="flex justify-between mt-6">
+                  <button 
+                    onClick={() => setStep(1)} 
+                    className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500"
+                  >
+                    上一步
+                  </button>
+                  <button 
+                    onClick={handleRecommendSpots} 
+                    disabled={!formData.group_size || formData.group_size.trim() === ''} 
+                    className={`px-5 py-2 rounded-lg text-sm font-bold text-white transition-colors
+                      ${(!formData.group_size || formData.group_size.trim() === '') 
+                        ? 'bg-slate-300 cursor-not-allowed' 
+                        : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                  >
+                    開始海選景點！
+                  </button>
                 </div>
-              )}
+              </div>
+            )}
 
               {step === 3 && (
                 <div className="flex-1 flex flex-col justify-between">
