@@ -18,7 +18,6 @@ class SmartTourEngine:
     def __init__(self):
         self.gemini_key = os.getenv("GEMINI_API_KEY")
         
-        
         self.db_config = {
             "host": os.getenv("DB_HOST", "127.0.0.1"),
             "port": int(os.getenv("DB_PORT", 3306)),
@@ -213,7 +212,7 @@ class SmartTourEngine:
 
             **12:00 - 13:00**
             [午餐餐廳名稱]
-            - 特色描述：享用當地特色美食。
+            - 特性描述：享用當地特色美食。
 
             6. 每晚結束時，請給予一個明確且符合該縣市交通邏輯的「建議住宿區域」。
 
@@ -232,3 +231,37 @@ class SmartTourEngine:
         except Exception as e:
             logger.error(f"最終行程生成引擎發生異常: {str(e)}")
             return f"最終行程生成引擎發生異常: {str(e)}，請重新觸發生成。"
+
+    def modify_itinerary(self, current_itinerary: str, modification_demand: str) -> str:
+        """【最終行程表微調修改功能】接收現有行程表與微調指令，由 AI 重新優化輸出 """
+        if not self.client:
+            return "Gemini API 尚未正確初始化。"
+
+        try:
+            prompt = f"""
+            你現在是台灣頂級智慧旅遊規劃師。
+            目前旅客已經生成了一份最終行程表，但提出了一些局部的微調或修改意見。
+            請你根據旅客的新需求，在維持原本優秀動線的基礎下，對行程進行精確的調整與重排。
+
+            【旅客的修改需求指令】
+            『{modification_demand}』
+
+            【目前的完整行程表】
+            {current_itinerary}
+
+            【硬性輸出排版規範】
+            1. 必須維持原有的分天架構（Day 1, Day 2...）。
+            2. 每日的大標題請用：### Day 1：[今日主題]
+            3. 每個景點必須附帶精準的「建議時間軸」（例如：09:30 - 11:00）。
+            4. 嚴禁輸出任何 <br> 標籤、|| 符號、或 Markdown 表格，請全部改用標準「多層次段落空行」換行。
+            5. 時間段與景點名字必須各自獨立成一行。
+
+            請輸出微調修改後、格式完全一致的全新智慧行程表。
+            """
+            
+            logger.info(f"🤖 正在為最終行程表執行微調需求 -> {modification_demand[:20]}...")
+            response = self.client.models.generate_content(model=self.model_name, contents=prompt)
+            return response.text if response.text else "微調行程表失敗，請重試。"
+        except Exception as e:
+            logger.error(f"行程表微調引擎發生異常: {str(e)}")
+            raise Exception(f"微調引擎發生異常: {str(e)}")
