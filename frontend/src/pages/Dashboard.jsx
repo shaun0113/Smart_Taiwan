@@ -156,8 +156,7 @@ export const Dashboard = () => {
           user_need: userNeed || `預計行程天數：${formData.days}天`, 
           city: formData.cities.join(','),       
           transport: formData.transport || '自駕',
-          // 可以自己改成其他測試縣市與時間
-          start_location: formData.start_location || '臺北市',
+          start_location: formData.start_location || '臺北市',  // 將出發地灌進去
           start_time: formData.start_time || '08:00'
         })
       });

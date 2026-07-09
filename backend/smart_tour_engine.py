@@ -181,8 +181,8 @@ class SmartTourEngine:
             new_spots = safe_accumulated + " + " + safe_user_choice if safe_accumulated else safe_user_choice
             return "CONTINUE", new_spots, f"已幫您記錄需求：『{safe_user_choice}』"
 
-    def generate_final_itinerary(self, accumulated_spots: str, user_need: str, city: str, transport: str = "自駕") -> str:
-        """【終極排程步驟】接收指定城市與交通約束，並以高規格寬鬆換行格式輸出最終行程表 """
+    def generate_final_itinerary(self, accumulated_spots: str, user_need: str, city: str, transport: str = "自駕", start_location: str = "臺北市", start_time: str = "08:00") -> str:
+        """【排程步驟】接收指定城市與交通約束，並以高規格寬鬆換行格式輸出最終行程表 """
         if not self.client:
             return "Gemini API 尚未正確初始化。"
 
@@ -190,31 +190,37 @@ class SmartTourEngine:
             spots_context = accumulated_spots if accumulated_spots else "請依照前述海選推薦名單中，最符合旅客標籤的景點來排程。"
             
             prompt = f"""
-            你現在是台灣頂級智慧旅遊規劃師。請針對旅客最終選定的【指定景點或微調意見】，結合其天數與需求，編排出一份極具可行性的完整旅遊行程表。
+            你現在是台灣智慧旅遊規劃師。請針對旅客最終選定的【指定景點或微調意見】，結合其天數與需求，編排出一份極具可行性的完整旅遊行程表。
 
-            【核心行為約束 - 城市與交通硬性指標】
-            1. 使用者指定的旅遊城市是：{city}。你規劃的所有景點、餐廳、活動、甚至內文提及的任何地標，必須 100% 屬於該縣市，絕對不准跨縣市、跨區域規劃！（例如：使用者選桃園市，就絕對不准出現任何台北市信義區的景點，請精確推薦桃園當地的景點與商場）。
-            2. 使用者指定的交通方式是：【{transport}】。請根據此交通工具的特性（例如大眾運輸要考慮班次與步行距離、自駕要考慮停車與路況），在交通描述中合理安排。
+            【核心行為約束 - 出發地與首日跨縣市車程時間指標】
+            1. 旅客本次旅程是從【{start_location}】出發，預計出發時間為【{start_time}】。
+            2. 使用者指定的目的地旅遊城市是：{city}。你規劃的所有景點、餐廳、活動、甚至內文提及的任何地標，必須 100% 屬於該縣市，絕對不准跨縣市、跨區域規劃！
+            3. 使用者指定的交通方式是：【{transport}】。
+            4. 【重要時間軸限制】：請你（AI）必須依據地理常識，精確估算從出發地「{start_location}」使用「{transport}」移動到目的地城市「{city}」所需的交通時間。
+            5. Day 1 的第一個行程，**絕對不能直接跳到目的地的景點**。你必須將這段「跨縣市出發的交通時間與車程」明確作為 Day 1 的第一條時間軸輸出！
+               例如：若 08:00 從台北自駕出發去南投，首個時間軸應寫：
+               **08:00 - 10:30**
+               從 {start_location} 出發前往 {city}（全程估計約 2.5 小時車程）
+               
+               隨後的第一個主要景點或午餐，才能從 10:30 或 11:00 開始編排。請嚴格遵守此車程時間推導邏輯！
 
             【核心排程與排版規範】
             1. 必須嚴格遵守【預計行程天數】分天編排（Day 1, Day 2...）。
             2. 每日的大標題請用：### Day 1：[今日主題]
             3. 每個景點必須附帶精準的「建議時間軸」（例如：09:30 - 11:00）。
-            4. 嚴禁輸出任何 <br> 標籤、|| 符號、或 Markdown 表格（如 |---| 這種欄位格式），請全部改用標準「多層次段落空行」換行。
-            5. 每個景點、活動與建議時間軸，必須嚴格按照以下「分行格式」輸出，時間段與景點名字必須各自獨立成一行：
+            4. 嚴禁輸出任何 <br> 標籤、|| 符號、或 Markdown 表格，請全部改用標準「多層次段落空行」換行。
+            5. 時間段與景點名字必須各自獨立成一行。
 
             【格式範例樣式】
             ### Day 1：[城市主軸探索]
-            **10:00 - 12:00**
-            [精選景點名稱一]
+            **08:00 - 10:30**
+            從 {start_location} 出發前往 {city}
             - 交通方式 ({transport})：...
+            - 特色描述：啟程出發。
+
+            **10:30 - 12:00**
+            [目的地的精選景點名稱一]
             - 特色描述：...
-
-            **12:00 - 13:00**
-            [午餐餐廳名稱]
-            - 特性描述：享用當地特色美食。
-
-            6. 每晚結束時，請給予一個明確且符合該縣市交通邏輯的「建議住宿區域」。
 
             【旅客基本需求】
             {user_need}
@@ -222,10 +228,10 @@ class SmartTourEngine:
             【旅客最終選定想去的景點與微調意見】
             {spots_context}
 
-            請輸出語氣貼心、格式極度留白、完全符合上方格式範例的最終智慧行程表。
+            請輸出語氣貼心、格式極度留白、完全符合上方格式範例（第一天首個行程必為車程）的最終智慧行程表。
             """
             
-            logger.info(f"最終行程表編排中 -> 鎖定城市: {city} | 交通方式: {transport}")
+            logger.info(f"最終行程表編排中 -> 鎖定城市: {city} | 出發地: {start_location} | 交通方式: {transport}")
             response = self.client.models.generate_content(model=self.model_name, contents=prompt)
             return response.text if response.text else "最終行程表生成失敗，請重試。"
         except Exception as e:
@@ -239,7 +245,7 @@ class SmartTourEngine:
 
         try:
             prompt = f"""
-            你現在是台灣頂級智慧旅遊規劃師。
+            你現在是台灣智慧旅遊規劃師。
             目前旅客已經生成了一份最終行程表，但提出了一些局部的微調或修改意見。
             請你根據旅客的新需求，在維持原本優秀動線的基礎下，對行程進行精確的調整與重排。
 
@@ -259,7 +265,7 @@ class SmartTourEngine:
             請輸出微調修改後、格式完全一致的全新智慧行程表。
             """
             
-            logger.info(f"🤖 正在為最終行程表執行微調需求 -> {modification_demand[:20]}...")
+            logger.info(f" 正在為行程表執行微調需求 -> {modification_demand[:20]}...")
             response = self.client.models.generate_content(model=self.model_name, contents=prompt)
             return response.text if response.text else "微調行程表失敗，請重試。"
         except Exception as e:
