@@ -419,38 +419,136 @@ export const Dashboard = () => {
               )}
 
               {step === 1 && (
-                <div className="flex-1 flex flex-col justify-between">
-                  <div>
-                    <h2 className="text-base font-bold text-slate-900 mb-1">第二步：時間天數與交通方式設定</h2>
-                    <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 my-4">
-                      <p className="text-xs text-slate-500 mb-2">預計天數：{formData.days} 天</p>
-                      <input type="range" min="1" max="7" value={formData.days} onChange={(e) => setFormData({ ...formData, days: parseInt(e.target.value) })} className="w-full accent-emerald-600" />
-                    </div>
-                    
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">交通方式：</p>
-                    <div className="flex gap-3">
-                      {['大眾運輸', '自駕'].map(type => (
-                        <button 
-                          key={type}
-                          type="button"
-                          onClick={() => setFormData({ ...formData, transport: type })}
-                          className={`flex-1 py-2.5 rounded-lg text-xs font-bold border transition-all
-                            ${formData.transport === type 
-                              ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm' 
-                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                            }`}
-                        >
-                          {type === '大眾運輸' ? '大眾運輸' : '自駕'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex justify-between mt-4">
-                    <button onClick={() => setStep(0)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
-                    <button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">下一步</button>
+        <div className="flex-1 flex flex-col justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 mb-1">第二步：天數與偏好設定</h2>
+            
+            {/* 天數設定 */}
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-slate-600 mb-2">預計天數</label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map(d => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, days: d })}
+                    className={`flex-1 py-2 text-center rounded-xl text-xs font-semibold border transition-all
+                      ${formData.days === d ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
+                  >
+                    {d}天
+                  </button>
+                ))}
+              </div>
+            </div>
+      
+            {/* 交通方式設定 */}
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-slate-600 mb-2">交通工具</label>
+              <div className="flex gap-2">
+                {['自駕', '大眾運輸'].map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, transport: t })}
+                    className={`flex-1 py-2 text-center rounded-xl text-xs font-semibold border transition-all
+                      ${formData.transport === t ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+      
+            {/* 👇 旅遊目的與偏好標籤設定 */}
+            <div className="mb-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-2">旅遊目的 / 偏好標籤</label>
+              <div className="flex flex-wrap gap-2">
+                {['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].map(tag => {
+                  const isSelected = formData.tags && formData.tags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => {
+                        let newTags = formData.tags ? [...formData.tags] : [];
+                        if (isSelected) {
+                          newTags = newTags.filter(t => t !== tag);
+                        } else {
+                          newTags.push(tag);
+                        }
+                        setFormData({ ...formData, tags: newTags });
+                      }}
+                      className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all
+                        ${isSelected ? 'bg-emerald-50 text-emerald-700 border-emerald-500 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+      
+                {/* 其他按鈕 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    // 切換自訂標籤的顯示狀態，這裏我們用一個臨時狀態或者檢查 tags 內是否有自訂欄位
+                    if (!formData._showCustomTagInput) {
+                      setFormData({ ...formData, _showCustomTagInput: true });
+                    } else {
+                      setFormData({ ...formData, _showCustomTagInput: false });
+                    }
+                  }}
+                  className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all
+                    ${formData._showCustomTagInput ? 'bg-emerald-50 text-emerald-700 border-emerald-500' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
+                >
+                  其他
+                </button>
+              </div>
+      
+              {/* 當點擊「其他」時，動態跳出輸入框 */}
+              {formData._showCustomTagInput && (
+                <div className="mt-3 animate-fadeIn">
+                  <input
+                    type="text"
+                    placeholder="請輸入其他旅遊目的，輸入完按 Enter 新增標籤"
+                    className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && e.target.value.trim() !== '') {
+                        e.preventDefault();
+                        const newTag = e.target.value.trim();
+                        let currentTags = formData.tags ? [...formData.tags] : [];
+                        if (!currentTags.includes(newTag)) {
+                          currentTags.push(newTag);
+                        }
+                        setFormData({ ...formData, tags: currentTags });
+                        e.target.value = ''; // 清空輸入框
+                      }
+                    }}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">💡 輸入你想去的目的（如：深度文化、逛街購物）後按 Enter 鍵即可成功加入標籤清單。</p>
+                  
+                  {/* 顯示目前已經自行輸入的非罐頭標籤，讓使用者可以看見並點擊取消 */}
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].includes(t)).map(customTag => (
+                      <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2 py-1 rounded-md border border-slate-200">
+                        {customTag}
+                        <button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => {
+                          setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) });
+                        }}>×</button>
+                      </span>
+                    ))}
                   </div>
                 </div>
               )}
+            </div>
+      
+          </div>
+      
+          <div className="flex justify-between mt-6">
+            <button onClick={() => setStep(0)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
+            <button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">下一步</button>
+          </div>
+        </div>
+      )}
 
               {step === 2 && (
                <div className="flex-1 flex flex-col justify-between">
