@@ -62,14 +62,14 @@ export const Dashboard = () => {
     }
   };
 
-  // ==================== 1. 景點海選 (對齊本地 MySQL 讀取) ====================
+  // ==================== 1. 景點海選 (對齊 Render 雲端後端) ====================
   const handleRecommendSpots = async () => {
     try {
       setLoading(true);
       setErrorMsg("");
       setStep(3); 
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/recommend-spots', {
+      const res = await fetch('https://smart-taiwan.onrender.com/api/v1/recommend-spots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -94,14 +94,14 @@ export const Dashboard = () => {
       }
     } catch (error) {
       console.error(error);
-      setErrorMsg("景點海選連線失敗，請確認後端 Python 服務是否正常啟動。");
+      setErrorMsg("景點海選連線失敗，請確認 Render 後端雲端服務是否正常啟動。");
       setStep(2);
     } finally {
       setLoading(false);
     }
   };
 
-  // ==================== 2. 意圖網閘微調意見 ====================
+  // ==================== 2. 意圖網閘微調意見 (對齊 Render 雲端後端) ====================
   const handleAnalyzeSelection = async (e) => {
     if (e) e.preventDefault();
     if (!userChoice.trim() || loading) return;
@@ -110,7 +110,7 @@ export const Dashboard = () => {
       setLoading(true);
       setErrorMsg("");
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/analyze-selection', {
+      const res = await fetch('https://smart-taiwan.onrender.com/api/v1/analyze-selection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -136,19 +136,19 @@ export const Dashboard = () => {
       }
     } catch (error) {
       console.error(error);
-      setErrorMsg("微調意見發送失敗，請檢查後端連線. ");
+      setErrorMsg("微調意見發送失敗，請檢查雲端後端連線。");
     } finally {
       setLoading(false);
     }
   };
 
-  // ==================== 3. 終極排程 (對齊後端參數約束) ====================
+  // ==================== 3. 終極排程 (對齊 Render 雲端後端) ====================
   const handleGenerateFinal = async (targetSpots = null) => {
     try {
       setLoading(true);
       setErrorMsg("");
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/generate-final', {
+      const res = await fetch('https://smart-taiwan.onrender.com/api/v1/generate-final', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -175,7 +175,7 @@ export const Dashboard = () => {
     }
   };
 
-  // ==================== 7/3 最終行程表微調修改功能 ====================
+  // ==================== 4. 最終行程表微調修改功能 (對齊 Render 雲端後端) ====================
   const handleModifyItinerary = async (e) => {
     if (e) e.preventDefault();
     if (!userChoice.trim() || loading) return;
@@ -184,7 +184,7 @@ export const Dashboard = () => {
       setLoading(true);
       setErrorMsg("");
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/modify-itinerary', {
+      const res = await fetch('https://smart-taiwan.onrender.com/api/v1/modify-itinerary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -203,7 +203,7 @@ export const Dashboard = () => {
       }
     } catch (error) {
       console.error(error);
-      setErrorMsg("行程表微調請求失敗，請確認後端 Python 服務是否正常。");
+      setErrorMsg("行程表微調請求失敗，請確認 Render 後端雲端服務是否正常。");
     } finally {
       setLoading(false);
     }
@@ -213,6 +213,7 @@ export const Dashboard = () => {
     if (!finalItinerary) return;
     navigator.clipboard.writeText(finalItinerary)
       .then(() => {
+        const [copySuccess, setCopySuccess] = useState(false);
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000); 
       })
@@ -277,7 +278,7 @@ export const Dashboard = () => {
         {step === 4 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="text-base font-bold text-slate-900 mb-2">專屬行程路線導航</h2>
+              <h2 className="text-base font-bold text-slate-900 mb-2">專專屬行程路線導航</h2>
               <div className="h-64 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe
                   width="100%"
