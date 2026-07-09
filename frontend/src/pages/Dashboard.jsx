@@ -350,11 +350,12 @@ export const Dashboard = () => {
                     </p>
                   </div>
                 ) : (
-                  <div className="prose prose-emerald prose-base max-w-none text-left leading-loose space-y-6 md:prose-lg
-                    prose-headings:mt-6 prose-headings:mb-4 prose-headings:font-extrabold prose-headings:text-slate-900
-                    prose-p:mb-5 prose-p:leading-loose prose-p:text-slate-700
-                    prose-ul:list-disc prose-ul:pl-6 prose-ul:space-y-3
-                    prose-li:my-2">
+                  /* 已修正：縮減第五步最終行程表的段落間距 */
+                  <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-2
+                    prose-headings:mt-3 prose-headings:mb-1 prose-headings:font-bold prose-headings:text-slate-900
+                    prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700
+                    prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1
+                    prose-li:my-0.5">
                     <ReactMarkdown>
                       {finalItinerary || ''}
                     </ReactMarkdown>
@@ -388,14 +389,15 @@ export const Dashboard = () => {
           /* ==================== 步驟 0 ~ 3 的大框架 ==================== */
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
+            {/* 根據不同步驟動態顯示左側面板，或是第四步(step===3)觸發大搬家 */}
             {step === 3 ? (
+              /* ===== 第四步(step === 3)：海選大搬家 - 左側完全留給決策建議 ===== */
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[580px] lg:col-span-1 animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
                   <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-                     智慧旅遊決策建議
+                    💡 智慧旅遊決策建議
                   </h2>
                   
-                  {/* 放大字體及加寬行距 */}
                   <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 whitespace-pre-line tracking-wide">
                     {loading ? (
                       <div className="h-full flex flex-col items-center justify-center py-12">
@@ -407,7 +409,12 @@ export const Dashboard = () => {
                         <p className="text-xs font-semibold text-emerald-600 mt-4">正在調度本地大數據與過濾篩選最佳推薦中...</p>
                       </div>
                     ) : (
-                      <div className="prose prose-emerald prose-base max-w-none text-left leading-loose">
+                      /* 已修正：縮減第四步海選決策建議的字體間距與段落高度 */
+                      <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-2
+                        prose-headings:mt-3 prose-headings:mb-1 prose-headings:font-bold prose-headings:text-slate-900
+                        prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700
+                        prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1
+                        prose-li:my-0.5">
                         <ReactMarkdown>
                           {spotsRecommendation || ''}
                         </ReactMarkdown>
@@ -620,7 +627,7 @@ export const Dashboard = () => {
 
             {/* ==================== 右側面板區塊 ==================== */}
             {step === 3 ? (
-              /* ===== 【新優化】第四步(step === 3)：海選大搬家 - 右側欄放地圖與控制台 ===== */
+              /* ===== 第四步(step === 3)：海選大搬家 - 右側欄放地圖與控制台 ===== */
               <section className="flex flex-col gap-6 lg:col-span-1 animate-fadeIn">
                 {/* 地圖導航 */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
@@ -658,7 +665,7 @@ export const Dashboard = () => {
                       </button>
                     </form>
 
-                    {/* 歷史意見紀錄小標籤（常駐堆疊展示，取代舊對話框） */}
+                    {/* 歷史意見紀錄小標籤（常駐堆疊展示） */}
                     {accumulatedSpots && accumulatedSpots.trim() !== "" && (
                       <div className="mt-1">
                         <span className="block text-[11px] font-semibold text-slate-400 mb-1.5">已提交的變更需求紀錄：</span>
