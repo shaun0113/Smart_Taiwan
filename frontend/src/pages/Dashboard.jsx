@@ -433,7 +433,7 @@ export const Dashboard = () => {
                               : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                             }`}
                         >
-                          {type === '大眾運輸' ? '大眾運輸' : '輕鬆自駕'}
+                          {type === '大眾運輸' ? '大眾運輸' : '自駕'}
                         </button>
                       ))}
                     </div>
