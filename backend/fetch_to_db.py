@@ -9,17 +9,20 @@ logger = logging.getLogger(__name__)
 
 class TDXToMySQL:
     def __init__(self):
-        self.tdx_id = 'a112222028-fb0180d6-bcf1-4afb'
-        self.tdx_secret = 'f244a993-d7f3-4c08-986d-b60e472362f7'
+        # 優先讀取雲端環境變數，若讀不到才拿你原本的當備用（防呆安全機制）
+        self.tdx_id = os.environ.get('TDX_CLIENT_ID', 'a112222028-fb0180d6-bcf1-4afb')
+        self.tdx_secret = os.environ.get('TDX_CLIENT_SECRET', 'f244a993-d7f3-4c08-986d-b60e472362f7')
 
+        # 核心修復：動態讀取雲端/本地環境變數，並強制加上 Aiven 所需的 SSL 連線加密參數
         self.db_config = {
-            "host": "127.0.0.1",
-            "port": 3306,
-            "user": "root",
-            "password": "Yjo494m6..",          
-            "database": "smart_tour_taiwan",     
+            "host": os.environ.get('DB_HOST', '127.0.0.1'),
+            "port": int(os.environ.get('DB_PORT', 3306)),
+            "user": os.environ.get('DB_USER', 'root'),
+            "password": os.environ.get('DB_PASSWORD', 'Yjo494m6..'),          
+            "database": os.environ.get('DB_NAME', 'smart_tour_taiwan'),     
             "charset": "utf8mb4",
-            "cursorclass": pymysql.cursors.DictCursor
+            "cursorclass": pymysql.cursors.DictCursor,
+            "ssl": {"ssl_mode": "REQUIRED"}  # 👈 核心關鍵：強制要求 SSL 加密，解決 Aiven 連線被踢的問題
         }
 
     def _get_tdx_token(self):
@@ -51,6 +54,7 @@ class TDXToMySQL:
             return
 
         try:
+            logger.info(f"📡 正在嘗試連線至 MySQL 主機: {self.db_config['host']} (已啟用 SSL 加密防護)...")
             conn = pymysql.connect(**self.db_config)
             cursor = conn.cursor()
         except Exception as e:
@@ -87,7 +91,6 @@ class TDXToMySQL:
         """
 
         while True:
-            # 乾淨不帶任何 filter 的安全分頁
             query_params = {
                 "$top": page_size,
                 "$skip": skip_count,
@@ -104,23 +107,20 @@ class TDXToMySQL:
                         logger.error("❌ 伺服器持續鎖定，為保護金鑰，中斷本次同步。")
                         break
                     
-                    # 遇到 429 就地冬眠 15 秒，讓伺服器那邊的計數器重置
                     logger.warning(f"⚠️ 遭到 TDX 限制限制 (429)。啟動緊急退讓機制：就地冬眠 15 秒後重試目前分頁...")
                     time.sleep(15.0)
-                    continue  # continue 會直接回到 loop 開頭重新抓目前這一頁，不會漏掉資料
+                    continue
                 
                 if res.status_code != 200:
                     logger.error(f"❌ TDX 伺服器回傳錯誤 ({res.status_code})，跳出。內容: {res.text}")
                     break
 
-                # 請求成功，重置 429 計數
                 consecutive_429_count = 0
-
                 response_data = res.json()
                 spots_list = response_data.get("value", [])
                 
                 if not spots_list:
-                    break  # 資料抓完了，正常結束
+                    break
 
                 # 寫入資料庫
                 for spot in spots_list:
