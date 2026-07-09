@@ -25,7 +25,6 @@ export const Dashboard = () => {
   const [copySuccess, setCopySuccess] = useState(false);
 
   const resultEndRef = useRef(null);
-  // 新增一個指向行程表區塊的 Ref，方便列印功能精確定位
   const itineraryRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -35,17 +34,25 @@ export const Dashboard = () => {
   useEffect(() => {
     if (!loading) scrollToBottom();
   }, [spotsRecommendation, finalItinerary, loading, apiMsg]);
-
-  // 全域 Enter 鍵流暢控制機制
+  // 全域 Enter 鍵流暢控制機制（修復第三步輸入框按 Enter 沒反應的問題）
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if (e.key === 'Enter') {
-        if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') {
+        if (step === 3 || step === 4) return;
+
+        if (step !== 2 && document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') {
           return;
         }
+        
         if (step === 0) { e.preventDefault(); setStep(1); }
         else if (step === 1) { e.preventDefault(); setStep(2); }
-        else if (step === 2) { e.preventDefault(); handleRecommendSpots(); }
+        else if (step === 2) { 
+          e.preventDefault(); 
+          // 有打字才能觸發海選
+          if (formData.group_size && formData.group_size.trim() !== '') {
+            handleRecommendSpots(); 
+          }
+        }
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
