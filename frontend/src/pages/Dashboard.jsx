@@ -6,7 +6,7 @@ export const Dashboard = () => {
     start_location: '臺北市', 
     cities: ['臺北市'],
     days: 3,
-    group_size: '2人',
+    group_size: '2-4人',
     tags: [],
     transport: '自駕',
     start_time: '08:00'
@@ -25,6 +25,9 @@ export const Dashboard = () => {
   
   const [copySuccess, setCopySuccess] = useState(false);
 
+  // 地圖即時定位狀態
+  const [mapQuery, setMapQuery] = useState('臺北市');
+
   const resultEndRef = useRef(null);
   const itineraryRef = useRef(null);
 
@@ -37,20 +40,66 @@ export const Dashboard = () => {
   }, [step]);
 
   useEffect(() => {
-    if (!loading && step === 5) {
+    if (!loading && step === 5) { 
       scrollToBottom();
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
+  // 🚀 核心升級：智慧多點停靠路徑地圖生成器
+  const getMapSrc = () => {
+    const travelMode = formData.transport === '自駕' ? 'd' : 'r';
+
+    // 🌟 功能二修復：如果是在最後一步（最終行程頁），自動解析 AI 排出的景點順序，轉化為 Google 停靠站導航
+    if (step === 5 && finalItinerary) {
+      // 利用正則表達式，把 Markdown 內被粗體 ** 包裹的景點名稱或是數字標題後面的中文名稱撈出來
+      const regex = /(?:單日行程|第\s*\d+\s*天|景點|📍|🐾)[:：\-\s]*([^\n\*\-\d\(\)\（\）]+)/g;
+      let matchedSpots = [];
+      let match;
+      
+      // 簡單提取行程內可能出現的景點關鍵字
+      const lines = finalItinerary.split('\n');
+      lines.forEach(line => {
+        // 如果行內含有具體景點指標（例如以數字開頭、有粗體，且字數適中的地名）
+        if ((line.includes('**') || line.match(/^\d+[\.\、]/)) && line.length < 50) {
+          const cleanName = line.replace(/[\*#_`\d\.\、\-\[\]\(\)]/g, '').replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '').trim();
+          if (cleanName && cleanName.length > 1 && cleanName.length < 15 && !cleanName.includes('行程') && !cleanName.includes('第') && !cleanName.includes('天')) {
+            matchedSpots.push(cleanName);
+          }
+        }
+      });
+
+      // 去除重複景點
+      const uniqueSpots = [...new Set(matchedSpots)].slice(0, 8); // Google Embed 限制上限約 8 個停靠點
+
+      if (uniqueSpots.length > 0) {
+        const origin = formData.start_location;
+        const destination = uniqueSpots[uniqueSpots.length - 1]; // 最後一個景點作為終點
+        const waypoints = uniqueSpots.slice(0, uniqueSpots.length - 1).join('+'); // 中間的景點當作停靠站
+
+        // 串接成 Google Maps 多點導航網址
+        return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(destination)}&to=${encodeURIComponent(waypoints)}&dirflg=${travelMode}&output=embed`;
+      }
+    }
+
+    // 基礎海選步驟地圖邏輯
+    if (mapQuery && mapQuery !== formData.start_location && mapQuery !== formData.cities[0]) {
+      return `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+    }
+
+    if (formData.start_location === formData.cities[0]) {
+      return `https://maps.google.com/maps?q=${encodeURIComponent(formData.cities[0] + ' 景點')}&output=embed`;
+    }
+
+    return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(formData.cities[0])}&dirflg=${travelMode}&output=embed`;
+  };
+
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if (e.key === 'Enter') {
-        if (step === 4 || step === 5) return; 
-
+        if (step === 4 || step === 5) return;
         if (step !== 3 && document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') {
           return;
         }
-        
         if (step === 0) { e.preventDefault(); setStep(1); } 
         else if (step === 1) { e.preventDefault(); setStep(2); } 
         else if (step === 2) { e.preventDefault(); setStep(3); } 
@@ -76,7 +125,6 @@ export const Dashboard = () => {
     }
   };
 
-  // ==================== 1. 景點海選 ====================
   const handleRecommendSpots = async () => {
     try {
       setLoading(true);
@@ -102,6 +150,7 @@ export const Dashboard = () => {
         setSpotsRecommendation(data.spots_recommendation || "");
         setAccumulatedSpots(data.accumulated_spots || "");
         setApiMsg("請檢閱左側由資料庫海選出的 AI 決策建議名單。您可以在右側控制台輸入偏好進行調整，滿意後請點選『確定編排行程表』！");
+        setMapQuery(formData.cities[0]);
       } else {
         setErrorMsg(`海選景點失敗：${data.detail || JSON.stringify(data)}`);
         setStep(3);
@@ -115,7 +164,6 @@ export const Dashboard = () => {
     }
   };
 
-  // ==================== 2. 意圖網閘微調意見 ====================
   const handleAnalyzeSelection = async (e) => {
     if (e) e.preventDefault();
     if (!userChoice.trim() || loading) return;
@@ -123,6 +171,7 @@ export const Dashboard = () => {
     try {
       setLoading(true);
       setErrorMsg("");
+      setMapQuery(userChoice);
 
       const res = await fetch('https://smart-taiwan.onrender.com/api/v1/analyze-selection', {
         method: 'POST',
@@ -156,7 +205,6 @@ export const Dashboard = () => {
     }
   };
 
-  // ==================== 3. 排程 (出發地精準帶入後端) ====================
   const handleGenerateFinal = async (targetSpots = null) => {
     try {
       setLoading(true);
@@ -191,7 +239,6 @@ export const Dashboard = () => {
     }
   };
 
-  // ==================== 4. 最終行程表微調修改功能 ====================
   const handleModifyItinerary = async (e) => {
     if (e) e.preventDefault();
     if (!userChoice.trim() || loading) return;
@@ -199,6 +246,7 @@ export const Dashboard = () => {
     try {
       setLoading(true);
       setErrorMsg("");
+      setMapQuery(userChoice);
 
       const res = await fetch('https://smart-taiwan.onrender.com/api/v1/modify-itinerary', {
         method: 'POST',
@@ -237,110 +285,64 @@ export const Dashboard = () => {
 
   const handlePrintPDF = () => {
     if (!itineraryRef.current) return;
-    
     const printContent = itineraryRef.current.innerHTML;
     const originalContent = document.body.innerHTML;
-    
-    document.body.innerHTML = `
-      <div style="padding: 40px; font-family: sans-serif; max-width: 800px; margin: 0 auto;">
-        ${printContent}
-      </div>
-    `;
+    document.body.innerHTML = `<div style="padding: 40px; font-family: sans-serif; max-width: 800px; margin: 0 auto;">${printContent}</div>`;
     window.print();
-    
     document.body.innerHTML = originalContent;
     window.location.reload(); 
   };
 
-  // ==================== UI 畫面渲染 ====================
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
       <header className="border-b bg-white shadow-sm">
         <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
-          <h1 
-            className="text-2xl font-bold text-gray-800" 
-            onClick={() => setStep(0)} 
-            style={{ cursor: 'pointer' }}
-          >
+          <h1 className="text-2xl font-bold text-gray-800" onClick={() => setStep(0)} style={{ cursor: 'pointer' }}>
             智遊台灣 Smart Tour
           </h1>
-          <span className="text-xs text-slate-500 font-medium">
-            資管系畢業專題 – 國內智慧旅遊決策支援系統
-          </span>
+          <span className="text-xs text-slate-500 font-medium">資管系畢業專題 – 國內智慧旅遊決策支援系統</span>
         </div>
       </header>
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6">
-        
-        {/* 頂部進度條 (更新為 6 步總流程) */}
         <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-center mb-2">
             <span className="text-xs font-bold text-emerald-600 tracking-wider">SYSTEM PROGRESS</span>
             <span className="text-xs font-semibold text-slate-400">目前步驟：{step + 1} / 6</span>
           </div>
           <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-emerald-500 transition-all duration-500 ease-out"
-              style={{ width: `${(step + 1) * 16.66}%` }}
-            ></div>
+            <div className="h-full bg-emerald-500 transition-all duration-500 ease-out" style={{ width: `${(step + 1) * 16.66}%` }}></div>
           </div>
         </div>
 
-        {errorMsg && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg font-semibold text-sm mb-6 shadow-sm">
-             {errorMsg}
-          </div>
-        )}
+        {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg font-semibold text-sm mb-6 shadow-sm">{errorMsg}</div>}
 
-        {/* ==================== 第六步：生成最終行程結果 (step === 5) ==================== */}
         {step === 5 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="text-base font-bold text-slate-900 mb-2">專屬行程路線導航</h2>
-              <div className="h-64 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                <iframe
-                  width="100%"
-                  height="100%"
-                  frameBorder="0"
-                  style={{ border: 0 }}
-                  src={`https://maps.google.com/maps?q=${encodeURIComponent(formData.cities[0] + " 智慧旅遊")}&t=&z=12&ie=UTF8&iwloc=&output=embed`}
-                  allowFullScreen
-                ></iframe>
+              {/* 🌟 標題更新：呈現多點穿插的視覺驚喜 */}
+              <h2 className="text-base font-bold text-slate-900 mb-2">🗺️ 智慧串聯拓撲導航（出發地 ➔ 停靠景點 ➔ 終點）</h2>
+              <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen></iframe>
               </div>
             </div>
 
-            {/* 行程規劃表區塊 */}
             <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
-                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
-                  智遊台灣 專屬旅遊行程規劃表
-                </h2>
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專屬旅遊行程規劃表</h2>
                 <div className="flex gap-2 items-center">
                   <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
                     出發地：{formData.start_location} | {formData.days} 天 {formData.group_size} ({formData.transport})
                   </span>
-                  {formData.cities.map(c => (
-                    <span key={c} className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-semibold">
-                      {c}
-                    </span>
-                  ))}
+                  {formData.cities.map(c => <span key={c} className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-semibold">{c}</span>)}
                 </div>
               </div>
       
-              {/* 工具列 */}
               <div className="mb-4 flex gap-2 justify-end no-print">
-                <button 
-                  onClick={handleCopyToClipboard}
-                  className="px-4 py-2 text-xs font-bold rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-1.5 shadow-sm"
-                >
+                <button onClick={handleCopyToClipboard} className="px-4 py-2 text-xs font-bold rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-1.5 shadow-sm">
                   {copySuccess ? " 已複製到剪貼簿" : " 複製文字行程"}
                 </button>
-                <button 
-                  onClick={handlePrintPDF}
-                  className="px-4 py-2 text-xs font-bold rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-all flex items-center gap-1.5 shadow-sm"
-                >
-                   匯出 PDF / 列印
-                </button>
+                <button onClick={handlePrintPDF} className="px-4 py-2 text-xs font-bold rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-all flex items-center gap-1.5 shadow-sm">匯出 PDF / 列印</button>
               </div>
 
               <div className="bg-slate-50/70 rounded-xl p-8 border border-slate-100 min-h-[450px] text-slate-700 tracking-wide">
@@ -351,19 +353,11 @@ export const Dashboard = () => {
                       <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
                       <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce"></div>
                     </div>
-                    <p className="text-xs font-semibold text-emerald-600 mt-5 tracking-wide">
-                      正在為您編排、優化動線中，請稍候...
-                    </p>
+                    <p className="text-xs font-semibold text-emerald-600 mt-5 tracking-wide">正在為您編排、優化動線中，請稍候...</p>
                   </div>
                 ) : (
-                  <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-2
-                    prose-headings:mt-3 prose-headings:mb-1 prose-headings:font-bold prose-headings:text-slate-900
-                    prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700
-                    prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1
-                    prose-li:my-0.5">
-                    <ReactMarkdown>
-                      {finalItinerary || ''}
-                    </ReactMarkdown>
+                  <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-2 prose-headings:mt-3 prose-headings:mb-1 prose-headings:font-bold prose-headings:text-slate-900 prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700 prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1 prose-li:my-0.5">
+                    <ReactMarkdown>{finalItinerary || ''}</ReactMarkdown>
                   </div>
                 )}
               </div>
@@ -371,54 +365,47 @@ export const Dashboard = () => {
               <div className="mt-6 border-t border-slate-100 pt-5 no-print">
                 <h3 className="text-sm font-bold text-slate-800 mb-2"> 對行程不滿意？你想修改哪裡：</h3>
                 <form onSubmit={handleModifyItinerary} className="flex gap-2">
-                  <input 
-                    type="text" 
-                    value={userChoice}
-                    onChange={(e) => setUserChoice(e.target.value)}
-                    disabled={loading} 
-                    placeholder={loading ? "正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排鬆一點..."}
-                    className="flex-1 text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner"
-                  />
-                  <button 
-                    type="submit" 
-                    disabled={loading || !userChoice.trim()} 
-                    className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 shadow-md shadow-emerald-600/10 transition-all"
-                  >
-                    {loading ? "修改中..." : "送出修改需求"}
-                  </button>
+                  <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder={loading ? "正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排鬆一點..."} className="flex-1 text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
+                  <button type="submit" disabled={loading || !userChoice.trim()} className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 shadow-md shadow-emerald-600/10 transition-all">{loading ? "修改中..." : "送出修改需求"}</button>
                 </form>
               </div>
             </div>
           </div>
         ) : (
-          /* ==================== 步驟 0 ~ 4 的大框架 ==================== */
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
             {step === 4 ? (
-              /* ===== 第五步(step === 4)：海選大搬家 - 左側完全留給決策建議 ===== */
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[580px] lg:col-span-1 animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
-                  <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-                    💡 智慧旅遊決策建議
-                  </h2>
+                  <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">💡 智慧旅遊決策建議</h2>
                   
                   <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 whitespace-pre-line tracking-wide">
                     {loading ? (
                       <div className="h-full flex flex-col items-center justify-center py-12">
-                        <div className="flex items-center space-x-1.5">
-                          <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                          <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                          <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div>
-                        </div>
+                        <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div></div>
                         <p className="text-xs font-semibold text-emerald-600 mt-4">正在調度本地大數據與過濾篩選最佳推薦中...</p>
                       </div>
                     ) : (
-                      <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-2
-                        prose-headings:mt-3 prose-headings:mb-1 prose-headings:font-bold prose-headings:text-slate-900
-                        prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700
-                        prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1
-                        prose-li:my-0.5">
-                        <ReactMarkdown>
+                      <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-2 prose-headings:mt-3 prose-headings:mb-1 prose-headings:font-bold prose-headings:text-slate-900 prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700 prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1 prose-li:my-0.5">
+                        {/* 🌟 功能一優化：為渲染出來的景點名稱加上「點擊地圖聯動」的互動按鈕 */}
+                        <ReactMarkdown 
+                          components={{
+                            h3: ({node, ...props}) => {
+                              const titleText = props.children?.toString() || "";
+                              return (
+                                <div className="flex items-center justify-between gap-2 mt-4 mb-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                  <h3 className="text-sm font-bold text-slate-900 !m-0">{titleText}</h3>
+                                  <button 
+                                    onClick={() => setMapQuery(titleText.replace(/[【】]/g, ''))}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-500 hover:text-white transition-all shadow-xs cursor-pointer"
+                                  >
+                                    🗺️ 地圖定位
+                                  </button>
+                                </div>
+                              )
+                            }
+                          }}
+                        >
                           {spotsRecommendation || ''}
                         </ReactMarkdown>
                       </div>
@@ -427,53 +414,28 @@ export const Dashboard = () => {
                 </div>
 
                 <div className="flex justify-between border-t border-slate-100 pt-4 mt-4">
-                  <button 
-                    onClick={() => setStep(3)} 
-                    className="px-5 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-500 hover:bg-slate-50 transition-colors"
-                  >
-                    重新規劃
-                  </button>
-                  <button 
-                    onClick={() => handleGenerateFinal(null)} 
-                    className="px-6 py-2.5 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm"
-                  >
-                    確定！編排完整行程表
-                  </button>
+                  <button onClick={() => setStep(3)} className="px-5 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-500 hover:bg-slate-50 transition-colors">重新規劃</button>
+                  <button onClick={() => handleGenerateFinal(null)} className="px-6 py-2.5 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm">確定！編排完整行程表</button>
                 </div>
               </section>
             ) : (
-              /* ===== 步驟 0, 1, 2, 3 的標準左側面板 ===== */
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
                 
-                {/*  新增第一步(step === 0)：選擇出發地 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第一步：你的出發地在哪裡？（單選）</h2>
                       <p className="text-xs text-slate-500 mb-4">系統將以此出發點精確估算第一天起點與交通路線時間。</p>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px] pr-1">
-                        {[
-                          "基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", 
-                          "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", 
-                          "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣"
-                        ].map(city => {
+                        {["基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣"].map(city => {
                           const isSelected = formData.start_location === city;
                           return (
-                            <div 
-                              key={city}
-                              onClick={() => setFormData({ ...formData, start_location: city })}
-                              className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none
-                                ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}
-                            >
-                              {city}
-                            </div>
+                            <div key={city} onClick={() => { setFormData({ ...formData, start_location: city }); setMapQuery(city); }} className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}>{city}</div>
                           );
                         })}
                       </div>
                     </div>
-                    <div className="flex justify-end mt-4">
-                      <button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all">下一步</button>
-                    </div>
+                    <div className="flex justify-end mt-4"><button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all">下一步</button></div>
                   </div>
                 )}
 
@@ -482,21 +444,10 @@ export const Dashboard = () => {
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第二步：你想去哪些目的地玩？（可複選）</h2>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px] pr-1">
-                        {[
-                          "基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", 
-                          "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", 
-                          "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣", "澎湖縣", "金門縣", "連江縣"
-                        ].map(city => {
+                        {["基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣", "澎湖縣", "金門縣", "連江縣"].map(city => {
                           const isSelected = formData.cities.includes(city);
                           return (
-                            <div 
-                              key={city}
-                              onClick={() => handleCheckboxChange('cities', city)}
-                              className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none
-                                ${isSelected ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}
-                            >
-                              {city}
-                            </div>
+                            <div key={city} onClick={() => { handleCheckboxChange('cities', city); setMapQuery(city); }} className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-50 text-white border-emerald-600 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}>{city}</div>
                           );
                         })}
                       </div>
@@ -512,107 +463,44 @@ export const Dashboard = () => {
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第三步：天數與偏好設定</h2>
-                      
                       <div className="mb-4">
                         <div className="flex justify-between items-center mb-1">
                           <label className="text-xs font-semibold text-slate-600">預計天數</label>
                           <span className="text-sm font-bold text-emerald-600">{formData.days} 天</span>
                         </div>
-                        <input
-                          type="range"
-                          min="1"
-                          max="7"
-                          value={formData.days}
-                          onChange={(e) => setFormData({ ...formData, days: parseInt(e.target.value) })}
-                          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                        />
-                        <div className="flex justify-between text-[10px] text-slate-400 px-1 mt-1">
-                          <span>1天</span><span>2天</span><span>3天</span><span>4天</span><span>5天</span><span>6天</span><span>7天</span>
-                        </div>
+                        <input type="range" min="1" max="7" value={formData.days} onChange={(e) => setFormData({ ...formData, days: parseInt(e.target.value) })} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" />
+                        <div className="flex justify-between text-[10px] text-slate-400 px-1 mt-1"><span>1天</span><span>2天</span><span>3天</span><span>4天</span><span>5天</span><span>6天</span><span>7天</span></div>
                       </div>
-                
                       <div className="mb-4">
                         <label className="block text-xs font-semibold text-slate-600 mb-2">交通工具</label>
                         <div className="flex gap-2">
                           {['自駕', '大眾運輸'].map(t => (
-                            <button
-                              key={t}
-                              type="button"
-                              onClick={() => setFormData({ ...formData, transport: t })}
-                              className={`flex-1 py-2 text-center rounded-xl text-xs font-semibold border transition-all
-                                ${formData.transport === t ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
-                            >
-                              {t}
-                            </button>
+                            <button key={t} type="button" onClick={() => setFormData({ ...formData, transport: t })} className={`flex-1 py-2 text-center rounded-xl text-xs font-semibold border transition-all ${formData.transport === t ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>{t}</button>
                           ))}
                         </div>
                       </div>
-                
                       <div className="mb-2">
                         <label className="block text-xs font-semibold text-slate-600 mb-2">旅遊目的 / 偏好標籤</label>
                         <div className="flex flex-wrap gap-2 mb-3">
                           {['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].map(tag => {
                             const isSelected = formData.tags && formData.tags.includes(tag);
                             return (
-                              <button
-                                key={tag}
-                                type="button"
-                                onClick={() => {
-                                  let newTags = formData.tags ? [...formData.tags] : [];
-                                  if (isSelected) {
-                                    newTags = newTags.filter(t => t !== tag);
-                                  } else {
-                                    newTags.push(tag);
-                                  }
-                                  setFormData({ ...formData, tags: newTags });
-                                }}
-                                className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all
-                                  ${isSelected ? 'bg-emerald-50 text-emerald-700 border-emerald-500 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
-                              >
-                                {tag}
-                              </button>
+                              <button key={tag} type="button" onClick={() => { let newTags = formData.tags ? [...formData.tags] : []; if (isSelected) { newTags = newTags.filter(t => t !== tag); } else { newTags.push(tag); } setFormData({ ...formData, tags: newTags }); }} className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all ${isSelected ? 'bg-emerald-50 text-emerald-700 border-emerald-500 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>{tag}</button>
                             );
                           })}
                         </div>
-                
                         <div className="mt-2">
-                          <input
-                            type="text"
-                            placeholder="請輸入其他旅遊目的，輸入完按 Enter 新增標籤"
-                            className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && e.target.value.trim() !== '') {
-                                e.preventDefault();
-                                const newTag = e.target.value.trim();
-                                let currentTags = formData.tags ? [...formData.tags] : [];
-                                if (!currentTags.includes(newTag)) {
-                                  currentTags.push(newTag);
-                                }
-                                setFormData({ ...formData, tags: currentTags });
-                                e.target.value = '';
-                              }
-                            }}
-                          />
-                          <p className="text-[10px] text-slate-400 mt-1"> 輸入你想去的目的（如：深度文化、逛街購物）後按 Enter 即可成功加入標籤</p>
-                          
+                          <input type="text" placeholder="請輸入其他旅遊目的，輸入完按 Enter 新增標籤" className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" onKeyDown={(e) => { if (e.key === 'Enter' && e.target.value.trim() !== '') { e.preventDefault(); const newTag = e.target.value.trim(); let currentTags = formData.tags ? [...formData.tags] : []; if (!currentTags.includes(newTag)) { currentTags.push(newTag); } setFormData({ ...formData, tags: currentTags }); e.target.value = ''; } }} />
+                          <p className="text-[10px] text-slate-400 mt-1">💡 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
                           <div className="flex flex-wrap gap-1 mt-2">
                             {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].includes(t)).map(customTag => (
-                              <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2 py-1 rounded-md border border-slate-200">
-                                {customTag}
-                                <button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => {
-                                  setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) });
-                                }}>×</button>
-                              </span>
+                              <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) }); }}>×</button></span>
                             ))}
                           </div>
                         </div>
                       </div>
                     </div>
-                
-                    <div className="flex justify-between mt-6">
-                      <button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
-                      <button onClick={() => setStep(3)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">下一步</button>
-                    </div>
+                    <div className="flex justify-between mt-6"><button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button><button onClick={() => setStep(3)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">下一步</button></div>
                   </div>
                 )}
 
@@ -621,78 +509,33 @@ export const Dashboard = () => {
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第四步：成員設定</h2>
                       <p className="text-xs text-slate-500 mb-4">請輸入本次旅遊的人數或成員結構（例如：3人、獨旅、5人公司出遊）</p>
-                      
-                      <div className="mt-2">
-                        <input
-                          type="text"
-                          placeholder="例如：2-4人、獨旅、家族旅遊10人..."
-                          value={formData.group_size || ''}
-                          onChange={(e) => setFormData({ ...formData, group_size: e.target.value })}
-                          className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner"
-                          autoFocus
-                        />
-                      </div>
+                      <div className="mt-2"><input type="text" placeholder="例如：2-4人、獨旅、家族旅遊10人..." value={formData.group_size || ''} onChange={(e) => setFormData({ ...formData, group_size: e.target.value })} className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" autoFocus /></div>
                     </div>
-                
-                    <div className="flex justify-between mt-6">
-                      <button 
-                        onClick={() => setStep(2)} 
-                        className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500"
-                      >
-                        上一步
-                      </button>
-                      <button 
-                        onClick={handleRecommendSpots} 
-                        disabled={!formData.group_size || formData.group_size.trim() === ''} 
-                        className={`px-5 py-2 rounded-lg text-sm font-bold text-white transition-colors
-                          ${(!formData.group_size || formData.group_size.trim() === '') 
-                            ? 'bg-slate-300 cursor-not-allowed' 
-                            : 'bg-emerald-600 hover:bg-emerald-700'}`}
-                      >
-                        開始海選景點！
-                      </button>
-                    </div>
+                    <div className="flex justify-between mt-6"><button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button><button onClick={handleRecommendSpots} disabled={!formData.group_size || formData.group_size.trim() === ''} className={`px-5 py-2 rounded-lg text-sm font-bold text-white transition-colors ${(!formData.group_size || formData.group_size.trim() === '') ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}>開始海選景點！</button></div>
                   </div>
                 )}
               </section>
             )}
 
-            {/* ==================== 右側面板區塊 ==================== */}
             {step === 4 ? (
-              /* ===== 第五步(step === 4)：海選大搬家 - 右側欄放地圖與控制台 ===== */
               <section className="flex flex-col gap-6 lg:col-span-1 animate-fadeIn">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                  <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖導航</h2>
-                  <div className="h-[220px] rounded-xl overflow-hidden border border-slate-100">
-                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={`https://maps.google.com/maps?q=${encodeURIComponent(formData.cities[0] + " 景點")}&output=embed`} allowFullScreen></iframe>
+                  <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖智慧導航（即時連動）</h2>
+                  <div className="h-[240px] rounded-xl overflow-hidden border border-slate-100">
+                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen></iframe>
                   </div>
                 </div>
 
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col gap-4">
                   <div>
                     <h2 className="text-base font-bold text-slate-900 mb-1">偏好意見調整控制台</h2>
-                    <p className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100/70">
-                      {apiMsg || "請檢閱左側 AI 智慧決策建議名單。"}
-                    </p>
+                    <p className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100/70">{apiMsg || "請檢閱左側 AI 智慧決策建議名單。"}</p>
                   </div>
 
                   <div className="flex flex-col gap-3">
                     <form onSubmit={handleAnalyzeSelection} className="flex gap-2">
-                      <input 
-                        type="text" 
-                        value={userChoice} 
-                        onChange={(e) => setUserChoice(e.target.value)} 
-                        disabled={loading} 
-                        placeholder="例如：某些景點不要去、加入特定新景點..."
-                        className="flex-1 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" 
-                      />
-                      <button 
-                        type="submit" 
-                        disabled={loading || !userChoice.trim()} 
-                        className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 transition-colors"
-                      >
-                        送出意見
-                      </button>
+                      <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="例如：輸入特定想查看的景點，地圖會即時切換定位..." className="flex-1 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
+                      <button type="submit" disabled={loading || !userChoice.trim()} className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 transition-colors">送出意見</button>
                     </form>
 
                     {accumulatedSpots && accumulatedSpots.trim() !== "" && (
@@ -702,14 +545,7 @@ export const Dashboard = () => {
                           {accumulatedSpots.split('+').map((opinion, idx) => {
                             const cleanOpinion = opinion.trim();
                             if (!cleanOpinion) return null;
-                            return (
-                              <span 
-                                key={idx} 
-                                className="inline-flex items-center bg-slate-50 text-slate-600 text-[11px] px-2.5 py-1 rounded-lg border border-slate-200/60 shadow-2xs font-medium"
-                              >
-                                🎯 {cleanOpinion}
-                              </span>
-                            );
+                            return <span key={idx} className="inline-flex items-center bg-slate-50 text-slate-600 text-[11px] px-2.5 py-1 rounded-lg border border-slate-200/60 shadow-2xs font-medium">🎯 {cleanOpinion}</span>;
                           })}
                         </div>
                       </div>
@@ -718,18 +554,17 @@ export const Dashboard = () => {
                 </div>
               </section>
             ) : (
-              /* ===== 步驟 0, 1, 2, 3 的標準右側面板 ===== */
               <section className="flex flex-col gap-4">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5">
-                  <h2 className="text-base font-bold text-slate-900 mb-1">區域地圖導航（動態展示）</h2>
-                  <div className="mt-2 h-44 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={`https://maps.google.com/maps?q=${encodeURIComponent(formData.start_location + " 景點")}&output=embed`} allowFullScreen></iframe>
+                  <h2 className="text-base font-bold text-slate-900 mb-1">區域地圖智慧導航（動態路線預覽）</h2>
+                  <div className="mt-2 h-52 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen></iframe>
                   </div>
                 </div>
 
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5 flex-1 flex flex-col">
                   <h2 className="text-base font-bold text-slate-900 mb-2">智慧旅遊決策建議</h2>
-                  <div className="flex-1 bg-slate-50/70 rounded-xl p-4 border border-slate-100 min-h-[300px] max-h-[440px] overflow-y-auto text-sm text-slate-700 flex items-center justify-center">
+                  <div className="flex-1 bg-slate-50/70 rounded-xl p-4 border border-slate-100 min-h-[260px] max-h-[360px] overflow-y-auto text-sm text-slate-700 flex items-center justify-center">
                     <p className="text-slate-400 text-xs text-center italic">尚未產生建議，請先在左側面板完成偏好設定。</p>
                   </div>
                 </div>
