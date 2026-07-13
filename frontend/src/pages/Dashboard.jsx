@@ -46,11 +46,12 @@ export const Dashboard = () => {
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
-  // 智慧多點停靠路徑地圖生成器
+  // 🚀 核心重構：換回不需要 API Key 的免簽 Google 地圖格式，徹底解決 401 拒絕存取問題
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
 
+    // 第五步（最終行程頁）：智慧多點停靠路徑導航
     if (step === 5 && finalItinerary) {
       const lines = finalItinerary.split('\n');
       let matchedSpots = [];
@@ -69,20 +70,20 @@ export const Dashboard = () => {
         const origin = formData.start_location;
         const destination = uniqueSpots[uniqueSpots.length - 1]; 
         const waypoints = uniqueSpots.slice(0, uniqueSpots.length - 1).join('+'); 
-        return `https://www.google.com/maps/embed/v1/directions?key=&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&waypoints=${encodeURIComponent(waypoints)}&mode=${travelMode === 'd' ? 'driving' : 'transit'}`;
+        return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(destination)}&to=${encodeURIComponent(waypoints)}&dirflg=${travelMode}&output=embed`;
       }
     }
 
     if (mapQuery && mapQuery !== formData.start_location && mapQuery !== targetCity) {
       const cleanQuery = mapQuery.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
-      return `https://www.google.com/maps/embed/v1/search?key=&q=${encodeURIComponent(cleanQuery || mapQuery)}&zoom=14`;
+      return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || mapQuery)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     }
 
     if (formData.start_location === targetCity) {
-      return `https://www.google.com/maps/embed/v1/search?key=&q=${encodeURIComponent(targetCity + ' 景點')}&zoom=14`;
+      return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     }
 
-    return `https://www.google.com/maps/embed/v1/directions?key=&origin=${encodeURIComponent(formData.start_location)}&destination=${encodeURIComponent(targetCity)}&mode=${travelMode === 'd' ? 'driving' : 'transit'}`;
+    return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
   };
 
   useEffect(() => {
@@ -392,7 +393,6 @@ export const Dashboard = () => {
                         <ReactMarkdown 
                           components={{
                             p: ({node, children}) => {
-                              // 🚀 核心優化：將 children 強制轉換為防禦陣列，徹底消除 .some() 崩潰
                               const childrenArray = Array.isArray(children) ? children : [children];
                               const hasSpot = childrenArray.some(child => 
                                 child?.props?.children && 
@@ -556,7 +556,7 @@ export const Dashboard = () => {
                           <p className="text-[10px] text-slate-400 mt-1">💡 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
                           <div className="flex flex-wrap gap-1 mt-2">
                             {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].includes(t)).map(customTag => (
-                              <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) }); }}>×</button></span>
+                              <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2.5 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) }); }}>×</button></span>
                             ))}
                           </div>
                         </div>
