@@ -54,13 +54,23 @@ const getMapSrc = () => {
     let firstSpot = null;
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if ((line.includes('**') || line.match(/^\d+[\.\、]/)) && line.length < 50) {
-        const cleanName = line.replace(/[\*#_`\d\.\、\-\[\]\(\)]/g, '').replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '').trim();
-        if (cleanName && cleanName.length > 1 && cleanName.length < 15 && !cleanName.includes('行程') && !cleanName.includes('第') && !cleanName.includes('天')) {
-          firstSpot = cleanName;
-          break; 
-        }
+      const cleanLine = lines[i]
+        .replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '')
+        .replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '')
+        .trim();
+
+      if (
+        cleanLine.length > 1 && 
+        cleanLine.length < 15 && 
+        !cleanLine.includes('行程') && 
+        !cleanLine.includes('第') && 
+        !cleanLine.includes('天') && 
+        !cleanLine.includes('好的') && 
+        !cleanLine.includes('歡迎') &&
+        !cleanLine.includes('摘要')
+      ) {
+        firstSpot = cleanLine;
+        break; 
       }
     }
 
