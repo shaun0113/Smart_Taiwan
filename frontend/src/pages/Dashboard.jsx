@@ -47,7 +47,7 @@ export const Dashboard = () => {
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
-  // 🚀 智慧演算法重構：精準識別「時間行」，剔除客套話雜訊，100% 鎖定第一天首站真實景點
+  // 🚀 終極識別上演算法：精準拔除「午餐/晚餐/點心」等前綴干擾，並強制綁定縣市關鍵字，防止跨縣市亂導航
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
@@ -59,19 +59,21 @@ export const Dashboard = () => {
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         
-        // 🎯 核心過濾：行程表景點一定帶有時間軸格式 (例如 12:00 - 13:30 或 08:00-10:00)
+        // 1. 識別帶有時間格式的行
         if (line.match(/\d{2}:\d{2}/) && (line.includes('-') || line.includes('─') || line.includes('～'))) {
-          // 1. 把時間文字剔除 (例如：把 "12:00 - 13:30 從台北前往" 或是 "12:00 - 13:30 文章牛肉湯" 清理)
+          // 切除時間文字
           let cleanName = line.replace(/^\d{2}:\d{2}\s*[-─～]\s*\d{2}:\d{2}/, '').trim();
           
-          // 2. 去除常見的 Markdown 符號與環境雜訊字
+          // 🎯 關鍵優化：徹底拔除「午餐：」、「晚餐：」、「點心：」、「推薦：」、「景點：」等常見前綴結構
+          cleanName = cleanName.replace(/^(午餐|晚餐|點心|早餐|下午茶|景點|推薦|行程)[:：\s]*/, '').trim();
+
+          // 去除殘留的 Markdown 標籤與特殊符號
           cleanName = cleanName
             .replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '')
             .replace(/^(前往|出發前往|到|至|抵達)/, '')
-            .replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '')
             .trim();
 
-          // 3. 排除交通路程的客套敘述行 (例如 "從新北市新店區出發前往台南")
+          // 排除不屬於真實景點的目的地敘述行
           if (
             cleanName.length > 1 && 
             cleanName.length < 20 && 
@@ -80,38 +82,21 @@ export const Dashboard = () => {
             !cleanName.includes('車程') && 
             !cleanName.includes('高鐵') &&
             !cleanName.includes('飯店') &&
-            !cleanName.includes('入住')
+            !cleanName.includes('入住') &&
+            !cleanName.includes(formData.start_location) // 排除起點自身
           ) {
             firstSpot = cleanName;
-            break; // 完美抓到真正的第一個目的地景點，立刻中斷退出
+            break; 
           }
         }
       }
 
-      // 🔥 萬一真的沒抓到時間行，啟動備用防禦機制，按原本的格式精準抓
-      if (!firstSpot) {
-        for (let i = 0; i < lines.length; i++) {
-          const cleanLine = lines[i]
-            .replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '')
-            .replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '')
-            .trim();
-
-          if (
-            cleanLine.length > 1 && 
-            cleanLine.length < 15 && 
-            !cleanLine.includes('行程') && !cleanLine.includes('第') && !cleanLine.includes('天') && 
-            !cleanLine.includes('好的') && !cleanLine.includes('歡迎') && !cleanLine.includes('摘要') &&
-            !cleanLine.includes('約會') && !cleanLine.includes('吃貨') && !cleanLine.includes('打卡')
-          ) {
-            firstSpot = cleanLine;
-            break;
-          }
-        }
-      }
-
+      // 如果成功識別出景點，為了防禦 Google 地圖在異地撈同名店，強制把目標城市塞進目的地導航
       if (firstSpot) {
         const origin = formData.start_location;
-        return `https://maps.google.com/maps?q=${encodeURIComponent(origin)}+to+${encodeURIComponent(firstSpot)}&saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(firstSpot)}&dirflg=${travelMode}&output=embed`;
+        // 如果抓出來的景點名稱開頭沒有包含該縣市，就手動幫它加上縣市限制（例如：周氏蝦捲 ➔ 臺南市周氏蝦捲）
+        const secureDestination = firstSpot.includes(targetCity.substring(0, 2)) ? firstSpot : `${targetCity}${firstSpot}`;
+        return `https://maps.google.com/maps?q=${encodeURIComponent(origin)}+to+${encodeURIComponent(secureDestination)}&saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(secureDestination)}&dirflg=${travelMode}&output=embed`;
       }
     }
 
@@ -630,7 +615,7 @@ export const Dashboard = () => {
 
                   <div className="flex flex-col gap-3">
                     <form onSubmit={handleAnalyzeSelection} className="flex gap-2">
-                      <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="例如：某些景點不要去、加入特定新景點..." className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
+                      <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="例如：某些景點不要去、加入特定新景點..." className="flex-1 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
                       <button type="submit" disabled={loading || !userChoice.trim()} className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 transition-colors">送出意見</button>
                     </form>
 
