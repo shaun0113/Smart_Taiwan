@@ -26,6 +26,7 @@ export const Dashboard = () => {
   
   const [copySuccess, setCopySuccess] = useState(false);
 
+  // 地圖即時定位狀態
   const [mapQuery, setMapQuery] = useState('臺北市');
 
   const resultEndRef = useRef(null);
@@ -39,12 +40,14 @@ export const Dashboard = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
 
+  // 只在 step === 4（海選微調頁）執行自動置底，第6步最終行程表產出時保持在最頂端
   useEffect(() => {
     if (!loading && step === 4) { 
       scrollToBottom();
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
+  // 🚀 智慧演算法重構：精準識別「時間行」，剔除客套話雜訊，100% 鎖定第一天首站真實景點
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
@@ -56,15 +59,19 @@ export const Dashboard = () => {
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         
+        // 🎯 核心過濾：行程表景點一定帶有時間軸格式 (例如 12:00 - 13:30 或 08:00-10:00)
         if (line.match(/\d{2}:\d{2}/) && (line.includes('-') || line.includes('─') || line.includes('～'))) {
+          // 1. 把時間文字剔除 (例如：把 "12:00 - 13:30 從台北前往" 或是 "12:00 - 13:30 文章牛肉湯" 清理)
           let cleanName = line.replace(/^\d{2}:\d{2}\s*[-─～]\s*\d{2}:\d{2}/, '').trim();
           
+          // 2. 去除常見的 Markdown 符號與環境雜訊字
           cleanName = cleanName
             .replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '')
             .replace(/^(前往|出發前往|到|至|抵達)/, '')
             .replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '')
             .trim();
 
+          // 3. 排除交通路程的客套敘述行 (例如 "從新北市新店區出發前往台南")
           if (
             cleanName.length > 1 && 
             cleanName.length < 20 && 
@@ -76,11 +83,12 @@ export const Dashboard = () => {
             !cleanName.includes('入住')
           ) {
             firstSpot = cleanName;
-            break; 
+            break; // 完美抓到真正的第一個目的地景點，立刻中斷退出
           }
         }
       }
 
+      // 🔥 萬一真的沒抓到時間行，啟動備用防禦機制，按原本的格式精準抓
       if (!firstSpot) {
         for (let i = 0; i < lines.length; i++) {
           const cleanLine = lines[i]
@@ -356,7 +364,7 @@ export const Dashboard = () => {
         {step === 5 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（出發地 ➔ 目的地首站）</h2>
+              <h2 className="text-base font-bold text-slate-900 mb-2">🗺️ 智慧啟程導航（出發地 ➔ 目的地首站）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Navigation"></iframe>
               </div>
@@ -438,13 +446,13 @@ export const Dashboard = () => {
                               if (cleanSpotName.length > 1 && cleanSpotName.length < 20 && !cleanSpotName.includes("推薦理由") && !cleanSpotName.includes("景點候選") && !cleanSpotName.includes("💡") && !cleanSpotName.includes("請檢閱")) {
                                 return (
                                   <div className="flex items-center justify-between gap-3 my-2 p-2.5 bg-slate-50 border border-slate-100 rounded-xl hover:bg-slate-100 transition-all shadow-2xs">
-                                    <p className="!m-0 text-slate-800 font-bold text-sm"> {children}</p>
+                                    <p className="!m-0 text-slate-800 font-bold text-sm">📍 {children}</p>
                                     <button 
                                       type="button"
                                       onClick={() => setMapQuery(cleanSpotName)}
                                       className="px-3 py-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap"
                                     >
-                                       查看景點
+                                      🗺️ 查看景點
                                     </button>
                                   </div>
                                 );
@@ -467,6 +475,7 @@ export const Dashboard = () => {
               </section>
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
+                {/* 第一步：起點出發地設定 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
@@ -477,7 +486,7 @@ export const Dashboard = () => {
                           onClick={() => setFormData({ ...formData, is_custom_start: !formData.is_custom_start, start_location: '臺北市' })}
                           className="text-xs font-bold text-emerald-600 hover:text-emerald-700 underline"
                         >
-                          {formData.is_custom_start ? "切換縣市選單" : " 輸入精確地址/地標"}
+                          {formData.is_custom_start ? "切換縣市選單" : "⌨️ 輸入精確地址/地標"}
                         </button>
                       </div>
                       <p className="text-xs text-slate-500 mb-4">系統將以此起點精確估算第一天的路徑開車與大眾運輸時間。</p>
@@ -501,7 +510,7 @@ export const Dashboard = () => {
                             className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
                             autoFocus
                           />
-                          <p className="text-[10px] text-slate-400 mt-2"> 精確地址可以包含地標名稱，右側地圖會即時為您測試定位解析線條。</p>
+                          <p className="text-[10px] text-slate-400 mt-2">💡 精確地址可以包含地標名稱，右側地圖會即時為您測試定位解析線條。</p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px] pr-1 animate-fadeIn">
@@ -578,7 +587,7 @@ export const Dashboard = () => {
                         </div>
                         <div className="mt-2">
                           <input type="text" placeholder="請輸入其他旅遊目的，輸入完按 Enter 新增標籤" className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" onKeyDown={(e) => { if (e.key === 'Enter' && e.target.value.trim() !== '') { e.preventDefault(); const newTag = e.target.value.trim(); let currentTags = formData.tags ? [...formData.tags] : []; if (!currentTags.includes(newTag)) { currentTags.push(newTag); } setFormData({ ...formData, tags: currentTags }); e.target.value = ''; } }} />
-                          <p className="text-[10px] text-slate-400 mt-1"> 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
+                          <p className="text-[10px] text-slate-400 mt-1">💡 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
                           <div className="flex flex-wrap gap-1 mt-2">
                             {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].includes(t)).map(customTag => (
                               <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2.5 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) }); }}>×</button></span>
