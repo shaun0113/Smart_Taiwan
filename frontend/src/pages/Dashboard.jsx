@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 export const Dashboard = () => {
   const [formData, setFormData] = useState({
     start_location: '臺北市',
-    is_custom_start: false, // 🚀 記錄是否啟用細部自訂出發地址
+    is_custom_start: false, 
     cities: ['臺北市'],
     days: 3,
     group_size: '2-4人',
@@ -46,12 +46,11 @@ export const Dashboard = () => {
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
-  // 🚀 核心重構：打通非同步瓶頸，徹底解決地圖路徑解析與樣板字串錯誤
+  // 智慧多點停靠路徑地圖生成器
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
 
-    // 第五步（最終行程頁）：智慧多點停靠路徑導航
     if (step === 5 && finalItinerary) {
       const lines = finalItinerary.split('\n');
       let matchedSpots = [];
@@ -70,33 +69,28 @@ export const Dashboard = () => {
         const origin = formData.start_location;
         const destination = uniqueSpots[uniqueSpots.length - 1]; 
         const waypoints = uniqueSpots.slice(0, uniqueSpots.length - 1).join('+'); 
-        // 🛠️ 已修正：改為標準 Google Maps 嵌入式導航路徑格式
-        return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(destination)}&to=${encodeURIComponent(waypoints)}&dirflg=${travelMode}&output=embed`;
+        return `https://www.google.com/maps/embed/v1/directions?key=&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&waypoints=${encodeURIComponent(waypoints)}&mode=${travelMode === 'd' ? 'driving' : 'transit'}`;
       }
     }
 
-    // 防禦機制：如果使用者在意見微調輸入多個景點，自動切分清洗，只拿第一個有效景點去渲染地圖，防止地圖卡死
     if (mapQuery && mapQuery !== formData.start_location && mapQuery !== targetCity) {
       const cleanQuery = mapQuery.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
-      // 🛠️ 已修正：改為標準單點搜尋 Embed 格式
-      return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || mapQuery)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+      return `https://www.google.com/maps/embed/v1/search?key=&q=${encodeURIComponent(cleanQuery || mapQuery)}&zoom=14`;
     }
 
-    // 初始步驟導航：若起點與第一個目的地相同，單純看該城市景點
     if (formData.start_location === targetCity) {
-      // 🛠️ 已修正：改為標準單點搜尋 Embed 格式
-      return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+      return `https://www.google.com/maps/embed/v1/search?key=&q=${encodeURIComponent(targetCity + ' 景點')}&zoom=14`;
     }
 
-    // 跨縣市導航預覽線條
-    // 🛠️ 已修正：改為標準兩點導航 Embed 格式
-    return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
+    return `https://www.google.com/maps/embed/v1/directions?key=&origin=${encodeURIComponent(formData.start_location)}&destination=${encodeURIComponent(targetCity)}&mode=${travelMode === 'd' ? 'driving' : 'transit'}`;
   };
 
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if (e.key === 'Enter') {
         if (step === 4 || step === 5) return;
+        if (step === 0 && formData.is_custom_start) return;
+
         if (step !== 3 && document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') {
           return;
         }
@@ -119,14 +113,12 @@ export const Dashboard = () => {
     const currentList = [...formData[field]];
     if (currentList.includes(value)) {
       if (field === 'cities' && currentList.length === 1) return; 
-      // 🚀 核心優化：如果取消了原本排在第一位的城市，地圖立刻切換到新清單的第一位，阻斷延遲
       const remaining = currentList.filter(item => item !== value);
       setFormData({ ...formData, [field]: remaining });
       setMapQuery(remaining[0] || formData.start_location);
     } else {
       const newList = [...currentList, value];
       setFormData({ ...formData, [field]: newList });
-      // 🚀 核心優化：新勾選城市時，地圖立刻強制同步聚焦到該新加入的城市，徹底解決點兩次 Bug
       setMapQuery(value);
     }
   };
@@ -374,8 +366,9 @@ export const Dashboard = () => {
               <div className="mt-6 border-t border-slate-100 pt-5 no-print">
                 <h3 className="text-sm font-bold text-slate-800 mb-2"> 對行程不滿意？你想修改哪裡：</h3>
                 <form onSubmit={handleModifyItinerary} className="flex gap-2">
-                  <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder={loading ? "正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排鬆一點..."} className="w-full text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
-                  <button type="submit" disabled={loading || !userChoice.trim()} className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 shadow-md shadow-emerald-600/10 transition-all">{loading ? "修改中..." : "送出修改需求"}</button>
+                  <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder={loading ? "正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排鬆一點..."} className="flex-1 text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
+                  <button type="submit" disabled={loading || !userChoice.trim()} className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 shadow-md shadow-emerald-600/10 transition-all">{loading ? "修改中..." : "送出修改需求"}
+                  </button>
                 </form>
               </div>
             </div>
@@ -399,14 +392,16 @@ export const Dashboard = () => {
                         <ReactMarkdown 
                           components={{
                             p: ({node, children}) => {
-                              const hasSpot = children.some(child => 
+                              // 🚀 核心優化：將 children 強制轉換為防禦陣列，徹底消除 .some() 崩潰
+                              const childrenArray = Array.isArray(children) ? children : [children];
+                              const hasSpot = childrenArray.some(child => 
                                 child?.props?.children && 
                                 (child.props.children.toString().length < 15)
                               );
                               
                               if (hasSpot) {
                                 let spotName = "";
-                                children.forEach(child => {
+                                childrenArray.forEach(child => {
                                   if (child?.props?.children) spotName += child.props.children.toString();
                                   else if (typeof child === 'string') spotName += child;
                                 });
@@ -471,8 +466,15 @@ export const Dashboard = () => {
                               setFormData({ ...formData, start_location: e.target.value });
                               setMapQuery(e.target.value);
                             }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (formData.start_location.trim()) setStep(1);
+                              }
+                            }}
                             placeholder="請輸入精確起點名稱（例如：台北車站、逢甲大學、新竹高鐵站）..."
                             className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
+                            autoFocus
                           />
                           <p className="text-[10px] text-slate-400 mt-2">💡 精確地址可以包含地標名稱，右側地圖會即時為您測試定位解析線條。</p>
                         </div>
@@ -594,7 +596,7 @@ export const Dashboard = () => {
 
                   <div className="flex flex-col gap-3">
                     <form onSubmit={handleAnalyzeSelection} className="flex gap-2">
-                      <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="例如：某些景點不要去、加入特定新景點..." className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
+                      <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="例如：某些景點不要去、加入特定新景點..." className="flex-1 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
                       <button type="submit" disabled={loading || !userChoice.trim()} className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 transition-colors">送出意見</button>
                     </form>
 
@@ -638,3 +640,5 @@ export const Dashboard = () => {
     </div>
   );
 };
+
+export default Dashboard;
