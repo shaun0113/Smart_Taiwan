@@ -7,7 +7,7 @@ export const Dashboard = () => {
     is_custom_start: false, 
     cities: ['臺北市'],
     days: 3,
-    group_size: '2人',
+    group_size: '2-4人',
     tags: [],
     transport: '自駕',
     start_time: '08:00'
@@ -26,6 +26,7 @@ export const Dashboard = () => {
   
   const [copySuccess, setCopySuccess] = useState(false);
 
+  // 地圖即時定位狀態
   const [mapQuery, setMapQuery] = useState('臺北市');
 
   const resultEndRef = useRef(null);
@@ -45,6 +46,7 @@ export const Dashboard = () => {
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
+  // 🚀 核心修正：將所有錯誤的 f"..." 換回 JavaScript 專用的 `...` 加密連結
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
@@ -196,7 +198,7 @@ export const Dashboard = () => {
       }
     } catch (error) {
       console.error(error);
-      setErrorMsg("微調意見發送失敗，請檢查雲端後端連線. ");
+      setErrorMsg("微調意見發送失敗，請檢查雲端後端連線。");
     } finally {
       setLoading(false);
     }
@@ -308,6 +310,7 @@ export const Dashboard = () => {
             <span className="text-xs font-semibold text-slate-400">目前步驟：{step + 1} / 6</span>
           </div>
           <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+            {/* 🚀 修正二：進度條寬度計算已移除不相容的 'f'，改為純字串 */}
             <div className="h-full bg-emerald-500 transition-all duration-500 ease-out" style={{ width: `${(step + 1) * 16.66}%` }}></div>
           </div>
         </div>
@@ -317,7 +320,7 @@ export const Dashboard = () => {
         {step === 5 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧串聯拓撲導航（出發地 ➔ 停靠景點 ➔ 終點）</h2>
+              <h2 className="text-base font-bold text-slate-900 mb-2">🗺️ 智慧串聯拓撲導航（出發地 ➔ 停靠景點 ➔ 終點）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen></iframe>
               </div>
@@ -445,14 +448,14 @@ export const Dashboard = () => {
                           onClick={() => setFormData({ ...formData, is_custom_start: false, start_location: '臺北市' })}
                           className={`py-3 text-xs font-bold rounded-lg transition-all ${!formData.is_custom_start ? 'bg-white text-emerald-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
                         >
-                           選擇縣市清單
+                          📍 選擇縣市清單
                         </button>
                         <button
                           type="button"
                           onClick={() => setFormData({ ...formData, is_custom_start: true, start_location: '' })}
                           className={`py-3 text-xs font-bold rounded-lg transition-all ${formData.is_custom_start ? 'bg-white text-emerald-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
                         >
-                           輸入精確地址 / 地標
+                          ⌨️ 輸入精確地址 / 地標
                         </button>
                       </div>
 
@@ -477,7 +480,7 @@ export const Dashboard = () => {
                             className="w-full text-xs rounded-xl border-2 border-emerald-500 bg-white text-slate-800 px-4 py-3.5 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-none transition-colors shadow-sm font-bold placeholder-slate-400"
                             autoFocus
                           />
-                          <p className="text-[10px] text-slate-400 mt-2.5"> 打完字後**直接在鍵盤按下 Enter 鍵**即可自動儲存並切換到下一步，右側地圖會即時同步測試解析。</p>
+                          <p className="text-[10px] text-slate-400 mt-2.5">💡 打完字後**直接在鍵盤按下 Enter 鍵**即可自動儲存並切換到下一步，右側地圖會即時同步測試解析。</p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[280px] pr-1 animate-fadeIn">
@@ -554,10 +557,10 @@ export const Dashboard = () => {
                         </div>
                         <div className="mt-2">
                           <input type="text" placeholder="請輸入其他旅遊目的，輸入完按 Enter 新增標籤" className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" onKeyDown={(e) => { if (e.key === 'Enter' && e.target.value.trim() !== '') { e.preventDefault(); const newTag = e.target.value.trim(); let currentTags = formData.tags ? [...formData.tags] : []; if (!currentTags.includes(newTag)) { currentTags.push(newTag); } setFormData({ ...formData, tags: currentTags }); e.target.value = ''; } }} />
-                          <p className="text-[10px] text-slate-400 mt-1"> 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
+                          <p className="text-[10px] text-slate-400 mt-1">💡 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
                           <div className="flex flex-wrap gap-1 mt-2">
                             {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].includes(t)).map(customTag => (
-                              <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) }); }}>×</button></span>
+                              <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2.5 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) }); }}>×</button></span>
                             ))}
                           </div>
                         </div>
@@ -641,3 +644,5 @@ export const Dashboard = () => {
     </div>
   );
 };
+
+export default Dashboard;
