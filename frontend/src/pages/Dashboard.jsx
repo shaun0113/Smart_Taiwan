@@ -23,7 +23,7 @@ export const Dashboard = () => {
   const [userChoice, setUserChoice] = useState('');
   const [finalItinerary, setFinalItinerary] = useState('');
   
-  // 控制複製成功提示的狀態 (已修正錯誤的函式內宣告)
+  // 控制複製成功提示的狀態
   const [copySuccess, setCopySuccess] = useState(false);
 
   // 地圖即時定位狀態
@@ -378,11 +378,9 @@ export const Dashboard = () => {
                       </div>
                     ) : (
                       <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-2 prose-headings:mt-3 prose-headings:mb-1 prose-headings:font-bold prose-headings:text-slate-900 prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700 prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1 prose-li:my-0.5">
-                        {/* 🚀 核心重構：消滅 <br> 並且在每個自動識別出來的景點旁渲染「🗺️ 專屬地圖按鈕」 */}
                         <ReactMarkdown 
                           components={{
                             p: ({node, children}) => {
-                              // 檢查子節點中是否包含具體景點指標（如 1. **景點名** 或 粗體地名）
                               const hasSpot = children.some(child => 
                                 child?.props?.children && 
                                 (child.props.children.toString().length < 15)
@@ -394,7 +392,6 @@ export const Dashboard = () => {
                                   if (child?.props?.children) spotName += child.props.children.toString();
                                   else if (typeof child === 'string') spotName += child;
                                 });
-                                // 乾淨萃取純景點中文字
                                 const cleanSpotName = spotName.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '').trim();
 
                                 if (cleanSpotName.length > 1 && cleanSpotName.length < 15 && !cleanSpotName.includes("推薦理由") && !cleanSpotName.includes("景點候選")) {
@@ -457,7 +454,7 @@ export const Dashboard = () => {
                         {["基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣", "澎湖縣", "金門縣", "連江縣"].map(city => {
                           const isSelected = formData.cities.includes(city);
                           return (
-                            <div key={city} onClick={() => { handleCheckboxChange('cities', city); setMapQuery(city); }} className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-50 text-white border-emerald-600 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}>{city}</div>
+                            <div key={city} onClick={() => { handleCheckboxChange('cities', city); setMapQuery(city); }} className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-md font-bold' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}>{city}</div>
                           );
                         })}
                       </div>
