@@ -3,11 +3,13 @@ import ReactMarkdown from 'react-markdown';
 
 export const Dashboard = () => {
   const [formData, setFormData] = useState({
+    start_location: '臺北市', 
     cities: ['臺北市'],
     days: 3,
-    group_size: '2-4人',
+    group_size: '2人',
     tags: [],
-    transport: '自駕' 
+    transport: '自駕',
+    start_time: '08:00'
   });
 
   const [step, setStep] = useState(0); 
@@ -35,7 +37,7 @@ export const Dashboard = () => {
   }, [step]);
 
   useEffect(() => {
-    if (!loading && step === 4) {
+    if (!loading && step === 5) {
       scrollToBottom();
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
@@ -43,15 +45,16 @@ export const Dashboard = () => {
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if (e.key === 'Enter') {
-        if (step === 3 || step === 4) return;
+        if (step === 4 || step === 5) return; 
 
-        if (step !== 2 && document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') {
+        if (step !== 3 && document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') {
           return;
         }
         
-        if (step === 0) { e.preventDefault(); setStep(1); }
-        else if (step === 1) { e.preventDefault(); setStep(2); }
-        else if (step === 2) { 
+        if (step === 0) { e.preventDefault(); setStep(1); } 
+        else if (step === 1) { e.preventDefault(); setStep(2); } 
+        else if (step === 2) { e.preventDefault(); setStep(3); } 
+        else if (step === 3) { 
           e.preventDefault(); 
           if (formData.group_size && formData.group_size.trim() !== '') {
             handleRecommendSpots(); 
@@ -73,12 +76,12 @@ export const Dashboard = () => {
     }
   };
 
-  // ==================== 1. 景點海選 (對齊 Render 雲端後端) ====================
+  // ==================== 1. 景點海選 ====================
   const handleRecommendSpots = async () => {
     try {
       setLoading(true);
       setErrorMsg("");
-      setStep(3); 
+      setStep(4); 
 
       const res = await fetch('https://smart-taiwan.onrender.com/api/v1/recommend-spots', {
         method: 'POST',
@@ -95,24 +98,24 @@ export const Dashboard = () => {
       const data = await res.json();
 
       if (res.ok && data) {
-        setUserNeed(data.user_need || `預計行程天數：${formData.days}天`);
+        setUserNeed(data.user_need || `出發地：${formData.start_location}，預計行程天數：${formData.days}天`);
         setSpotsRecommendation(data.spots_recommendation || "");
         setAccumulatedSpots(data.accumulated_spots || "");
         setApiMsg("請檢閱左側由資料庫海選出的 AI 決策建議名單。您可以在右側控制台輸入偏好進行調整，滿意後請點選『確定編排行程表』！");
       } else {
         setErrorMsg(`海選景點失敗：${data.detail || JSON.stringify(data)}`);
-        setStep(2);
+        setStep(3);
       }
     } catch (error) {
       console.error(error);
       setErrorMsg("景點海選連線失敗，請確認 Render 後端雲端服務是否正常啟動。");
-      setStep(2);
+      setStep(3);
     } finally {
       setLoading(false);
     }
   };
 
-  // ==================== 2. 意圖網閘微調意見 (對齊 Render 雲端後端) ====================
+  // ==================== 2. 意圖網閘微調意見 ====================
   const handleAnalyzeSelection = async (e) => {
     if (e) e.preventDefault();
     if (!userChoice.trim() || loading) return;
@@ -153,7 +156,7 @@ export const Dashboard = () => {
     }
   };
 
-  // ==================== 3. 排程 (對齊 Render 雲端後端) ====================
+  // ==================== 3. 排程 (出發地精準帶入後端) ====================
   const handleGenerateFinal = async (targetSpots = null) => {
     try {
       setLoading(true);
@@ -164,10 +167,10 @@ export const Dashboard = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accumulated_spots: targetSpots || accumulatedSpots, 
-          user_need: userNeed || `預計行程天數：${formData.days}天`, 
+          user_need: userNeed || `出發地：${formData.start_location}，預計行程天數：${formData.days}天`, 
           city: formData.cities.join(','),       
           transport: formData.transport || '自駕',
-          start_location: formData.start_location || '臺北市',
+          start_location: formData.start_location, 
           start_time: formData.start_time || '08:00'
         })
       });
@@ -176,7 +179,7 @@ export const Dashboard = () => {
 
       if (res.ok && data && data.result) {
         setFinalItinerary(data.result);
-        setStep(4); 
+        setStep(5); 
       } else {
         setErrorMsg(`最終行程生成失敗：${data.detail || JSON.stringify(data)}`);
       }
@@ -269,16 +272,16 @@ export const Dashboard = () => {
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6">
         
-        {/* 頂部進度條 */}
+        {/* 頂部進度條 (更新為 6 步總流程) */}
         <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-center mb-2">
             <span className="text-xs font-bold text-emerald-600 tracking-wider">SYSTEM PROGRESS</span>
-            <span className="text-xs font-semibold text-slate-400">目前步驟：{step + 1} / 5</span>
+            <span className="text-xs font-semibold text-slate-400">目前步驟：{step + 1} / 6</span>
           </div>
           <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
             <div 
               className="h-full bg-emerald-500 transition-all duration-500 ease-out"
-              style={{ width: `${(step + 1) * 20}%` }}
+              style={{ width: `${(step + 1) * 16.66}%` }}
             ></div>
           </div>
         </div>
@@ -289,8 +292,8 @@ export const Dashboard = () => {
           </div>
         )}
 
-        {/* ==================== 第五步：生成最終行程結果 ==================== */}
-        {step === 4 ? (
+        {/* ==================== 第六步：生成最終行程結果 (step === 5) ==================== */}
+        {step === 5 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
               <h2 className="text-base font-bold text-slate-900 mb-2">專屬行程路線導航</h2>
@@ -314,7 +317,7 @@ export const Dashboard = () => {
                 </h2>
                 <div className="flex gap-2 items-center">
                   <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
-                    {formData.days} 天 {formData.group_size} ({formData.transport})
+                    出發地：{formData.start_location} | {formData.days} 天 {formData.group_size} ({formData.transport})
                   </span>
                   {formData.cities.map(c => (
                     <span key={c} className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-semibold">
@@ -388,12 +391,11 @@ export const Dashboard = () => {
             </div>
           </div>
         ) : (
-          /* ==================== 步驟 0 ~ 3 的大框架 ==================== */
+          /* ==================== 步驟 0 ~ 4 的大框架 ==================== */
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            {/* 根據不同步驟動態顯示左側面板，或是第四步(step===3)觸發大搬家 */}
-            {step === 3 ? (
-              /* ===== 第四步(step === 3)：海選大搬家 - 左側完全留給決策建議 ===== */
+            {step === 4 ? (
+              /* ===== 第五步(step === 4)：海選大搬家 - 左側完全留給決策建議 ===== */
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[580px] lg:col-span-1 animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
                   <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
@@ -426,7 +428,7 @@ export const Dashboard = () => {
 
                 <div className="flex justify-between border-t border-slate-100 pt-4 mt-4">
                   <button 
-                    onClick={() => setStep(2)} 
+                    onClick={() => setStep(3)} 
                     className="px-5 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-500 hover:bg-slate-50 transition-colors"
                   >
                     重新規劃
@@ -440,12 +442,45 @@ export const Dashboard = () => {
                 </div>
               </section>
             ) : (
-              /* ===== 步驟 0, 1, 2 的標準左側面板 ===== */
+              /* ===== 步驟 0, 1, 2, 3 的標準左側面板 ===== */
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
+                
+                {/*  新增第一步(step === 0)：選擇出發地 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
-                      <h2 className="text-base font-bold text-slate-900 mb-1">第一步：你想去哪些地方玩？（可複選）</h2>
+                      <h2 className="text-base font-bold text-slate-900 mb-1">第一步：你的出發地在哪裡？（單選）</h2>
+                      <p className="text-xs text-slate-500 mb-4">系統將以此出發點精確估算第一天起點與交通路線時間。</p>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px] pr-1">
+                        {[
+                          "基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", 
+                          "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", 
+                          "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣"
+                        ].map(city => {
+                          const isSelected = formData.start_location === city;
+                          return (
+                            <div 
+                              key={city}
+                              onClick={() => setFormData({ ...formData, start_location: city })}
+                              className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none
+                                ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}
+                            >
+                              {city}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="flex justify-end mt-4">
+                      <button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all">下一步</button>
+                    </div>
+                  </div>
+                )}
+
+                {step === 1 && (
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900 mb-1">第二步：你想去哪些目的地玩？（可複選）</h2>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px] pr-1">
                         {[
                           "基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", 
@@ -466,18 +501,18 @@ export const Dashboard = () => {
                         })}
                       </div>
                     </div>
-                    <div className="flex justify-end mt-4">
-                      <button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all">下一步</button>
+                    <div className="flex justify-between mt-4">
+                      <button onClick={() => setStep(0)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
+                      <button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all">下一步</button>
                     </div>
                   </div>
                 )}
 
-                {step === 1 && (
+                {step === 2 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
-                      <h2 className="text-base font-bold text-slate-900 mb-1">第二步：天數與偏好設定</h2>
+                      <h2 className="text-base font-bold text-slate-900 mb-1">第三步：天數與偏好設定</h2>
                       
-                      {/* 預計天數 - 滑桿 */}
                       <div className="mb-4">
                         <div className="flex justify-between items-center mb-1">
                           <label className="text-xs font-semibold text-slate-600">預計天數</label>
@@ -496,7 +531,6 @@ export const Dashboard = () => {
                         </div>
                       </div>
                 
-                      {/* 交通工具 */}
                       <div className="mb-4">
                         <label className="block text-xs font-semibold text-slate-600 mb-2">交通工具</label>
                         <div className="flex gap-2">
@@ -514,7 +548,6 @@ export const Dashboard = () => {
                         </div>
                       </div>
                 
-                      {/* 旅遊目的與偏好標籤 */}
                       <div className="mb-2">
                         <label className="block text-xs font-semibold text-slate-600 mb-2">旅遊目的 / 偏好標籤</label>
                         <div className="flex flex-wrap gap-2 mb-3">
@@ -542,7 +575,6 @@ export const Dashboard = () => {
                           })}
                         </div>
                 
-                        {/* 其他自訂輸入框 - 常駐顯示 */}
                         <div className="mt-2">
                           <input
                             type="text"
@@ -561,9 +593,8 @@ export const Dashboard = () => {
                               }
                             }}
                           />
-                          <p className="text-[10px] text-slate-400 mt-1">💡 輸入你想去的目的（如：深度文化、逛街購物）後按 Enter 鍵即可成功加入標籤清單。</p>
+                          <p className="text-[10px] text-slate-400 mt-1"> 輸入你想去的目的（如：深度文化、逛街購物）後按 Enter 即可成功加入標籤</p>
                           
-                          {/* 顯示自行輸入的標籤 */}
                           <div className="flex flex-wrap gap-1 mt-2">
                             {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].includes(t)).map(customTag => (
                               <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2 py-1 rounded-md border border-slate-200">
@@ -579,16 +610,16 @@ export const Dashboard = () => {
                     </div>
                 
                     <div className="flex justify-between mt-6">
-                      <button onClick={() => setStep(0)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
-                      <button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">下一步</button>
+                      <button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
+                      <button onClick={() => setStep(3)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">下一步</button>
                     </div>
                   </div>
                 )}
 
-                {step === 2 && (
+                {step === 3 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
-                      <h2 className="text-base font-bold text-slate-900 mb-1">第三步：成員設定</h2>
+                      <h2 className="text-base font-bold text-slate-900 mb-1">第四步：成員設定</h2>
                       <p className="text-xs text-slate-500 mb-4">請輸入本次旅遊的人數或成員結構（例如：3人、獨旅、5人公司出遊）</p>
                       
                       <div className="mt-2">
@@ -605,7 +636,7 @@ export const Dashboard = () => {
                 
                     <div className="flex justify-between mt-6">
                       <button 
-                        onClick={() => setStep(1)} 
+                        onClick={() => setStep(2)} 
                         className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500"
                       >
                         上一步
@@ -627,18 +658,16 @@ export const Dashboard = () => {
             )}
 
             {/* ==================== 右側面板區塊 ==================== */}
-            {step === 3 ? (
-              /* ===== 第四步(step === 3)：海選大搬家 - 右側欄放地圖與控制台 ===== */
+            {step === 4 ? (
+              /* ===== 第五步(step === 4)：海選大搬家 - 右側欄放地圖與控制台 ===== */
               <section className="flex flex-col gap-6 lg:col-span-1 animate-fadeIn">
-                {/* 地圖導航 */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                  <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖導航（動態展示）</h2>
+                  <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖導航</h2>
                   <div className="h-[220px] rounded-xl overflow-hidden border border-slate-100">
                     <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={`https://maps.google.com/maps?q=${encodeURIComponent(formData.cities[0] + " 景點")}&output=embed`} allowFullScreen></iframe>
                   </div>
                 </div>
 
-                {/* 偏好意見控制台與標籤歷史紀錄 */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col gap-4">
                   <div>
                     <h2 className="text-base font-bold text-slate-900 mb-1">偏好意見調整控制台</h2>
@@ -666,7 +695,6 @@ export const Dashboard = () => {
                       </button>
                     </form>
 
-                    {/* 歷史意見紀錄小標籤（常駐堆疊展示） */}
                     {accumulatedSpots && accumulatedSpots.trim() !== "" && (
                       <div className="mt-1">
                         <span className="block text-[11px] font-semibold text-slate-400 mb-1.5">已提交的變更需求紀錄：</span>
@@ -690,12 +718,12 @@ export const Dashboard = () => {
                 </div>
               </section>
             ) : (
-              /* ===== 步驟 0, 1, 2 的標準右側面板 ===== */
+              /* ===== 步驟 0, 1, 2, 3 的標準右側面板 ===== */
               <section className="flex flex-col gap-4">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5">
                   <h2 className="text-base font-bold text-slate-900 mb-1">區域地圖導航（動態展示）</h2>
                   <div className="mt-2 h-44 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={`https://maps.google.com/maps?q=${encodeURIComponent(formData.cities[0] + " 景點")}&output=embed`} allowFullScreen></iframe>
+                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={`https://maps.google.com/maps?q=${encodeURIComponent(formData.start_location + " 景點")}&output=embed`} allowFullScreen></iframe>
                   </div>
                 </div>
 
