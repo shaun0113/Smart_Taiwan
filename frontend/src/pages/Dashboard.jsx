@@ -46,7 +46,7 @@ export const Dashboard = () => {
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
-  // 🚀 核心重構：換回不需要 API Key 的免簽 Google 地圖格式，徹底解決 401 拒絕存取問題
+  // 🚀 核心優化：換回完全不需要 API Key 的免簽官方嵌入格式，徹底修復 401 拒絕連線問題
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
@@ -74,15 +74,18 @@ export const Dashboard = () => {
       }
     }
 
+    // 防禦機制：如果使用者在意見微調輸入多個景點
     if (mapQuery && mapQuery !== formData.start_location && mapQuery !== targetCity) {
       const cleanQuery = mapQuery.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
       return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || mapQuery)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     }
 
+    // 初始步驟導航：若起點與第一個目的地相同
     if (formData.start_location === targetCity) {
       return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     }
 
+    // 跨縣市導航預覽
     return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
   };
 
@@ -368,8 +371,7 @@ export const Dashboard = () => {
                 <h3 className="text-sm font-bold text-slate-800 mb-2"> 對行程不滿意？你想修改哪裡：</h3>
                 <form onSubmit={handleModifyItinerary} className="flex gap-2">
                   <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder={loading ? "正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排鬆一點..."} className="flex-1 text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
-                  <button type="submit" disabled={loading || !userChoice.trim()} className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 shadow-md shadow-emerald-600/10 transition-all">{loading ? "修改中..." : "送出修改需求"}
-                  </button>
+                  <button type="submit" disabled={loading || !userChoice.trim()} className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 shadow-md shadow-emerald-600/10 transition-all">{loading ? "修改中..." : "送出修改需求"}</button>
                 </form>
               </div>
             </div>
@@ -393,6 +395,7 @@ export const Dashboard = () => {
                         <ReactMarkdown 
                           components={{
                             p: ({node, children}) => {
+                              // 🚀 核心安全防禦：將 children 強制轉換為陣列，徹底消滅 .some() 的白屏地雷
                               const childrenArray = Array.isArray(children) ? children : [children];
                               const hasSpot = childrenArray.some(child => 
                                 child?.props?.children && 
