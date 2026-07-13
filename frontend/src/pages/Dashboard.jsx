@@ -39,14 +39,12 @@ export const Dashboard = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
 
-  
   useEffect(() => {
     if (!loading && step === 4) { 
       scrollToBottom();
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
-  
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
@@ -56,23 +54,50 @@ export const Dashboard = () => {
       let firstSpot = null;
 
       for (let i = 0; i < lines.length; i++) {
-        const cleanLine = lines[i]
-          .replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '')
-          .replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '')
-          .trim();
+        const line = lines[i].trim();
+        
+        if (line.match(/\d{2}:\d{2}/) && (line.includes('-') || line.includes('─') || line.includes('～'))) {
+          let cleanName = line.replace(/^\d{2}:\d{2}\s*[-─～]\s*\d{2}:\d{2}/, '').trim();
+          
+          cleanName = cleanName
+            .replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '')
+            .replace(/^(前往|出發前往|到|至|抵達)/, '')
+            .replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '')
+            .trim();
 
-        if (
-          cleanLine.length > 1 && 
-          cleanLine.length < 15 && 
-          !cleanLine.includes('行程') && 
-          !cleanLine.includes('第') && 
-          !cleanLine.includes('天') && 
-          !cleanLine.includes('好的') && 
-          !cleanLine.includes('歡迎') &&
-          !cleanLine.includes('摘要')
-        ) {
-          firstSpot = cleanLine;
-          break; 
+          if (
+            cleanName.length > 1 && 
+            cleanName.length < 20 && 
+            !cleanName.includes('出發') && 
+            !cleanName.includes('前往') && 
+            !cleanName.includes('車程') && 
+            !cleanName.includes('高鐵') &&
+            !cleanName.includes('飯店') &&
+            !cleanName.includes('入住')
+          ) {
+            firstSpot = cleanName;
+            break; 
+          }
+        }
+      }
+
+      if (!firstSpot) {
+        for (let i = 0; i < lines.length; i++) {
+          const cleanLine = lines[i]
+            .replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '')
+            .replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '')
+            .trim();
+
+          if (
+            cleanLine.length > 1 && 
+            cleanLine.length < 15 && 
+            !cleanLine.includes('行程') && !cleanLine.includes('第') && !cleanLine.includes('天') && 
+            !cleanLine.includes('好的') && !cleanLine.includes('歡迎') && !cleanLine.includes('摘要') &&
+            !cleanLine.includes('約會') && !cleanLine.includes('吃貨') && !cleanLine.includes('打卡')
+          ) {
+            firstSpot = cleanLine;
+            break;
+          }
         }
       }
 
@@ -413,13 +438,13 @@ export const Dashboard = () => {
                               if (cleanSpotName.length > 1 && cleanSpotName.length < 20 && !cleanSpotName.includes("推薦理由") && !cleanSpotName.includes("景點候選") && !cleanSpotName.includes("💡") && !cleanSpotName.includes("請檢閱")) {
                                 return (
                                   <div className="flex items-center justify-between gap-3 my-2 p-2.5 bg-slate-50 border border-slate-100 rounded-xl hover:bg-slate-100 transition-all shadow-2xs">
-                                    <p className="!m-0 text-slate-800 font-bold text-sm">📍 {children}</p>
+                                    <p className="!m-0 text-slate-800 font-bold text-sm"> {children}</p>
                                     <button 
                                       type="button"
                                       onClick={() => setMapQuery(cleanSpotName)}
                                       className="px-3 py-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap"
                                     >
-                                      🗺️ 查看景點
+                                       查看景點
                                     </button>
                                   </div>
                                 );
