@@ -21,7 +21,6 @@ export const Dashboard = () => {
   const [userChoice, setUserChoice] = useState('');
   const [finalItinerary, setFinalItinerary] = useState('');
   
-  // 控制複製成功提示的狀態
   const [copySuccess, setCopySuccess] = useState(false);
 
   const resultEndRef = useRef(null);
@@ -32,10 +31,15 @@ export const Dashboard = () => {
   };
 
   useEffect(() => {
-    if (!loading) scrollToBottom();
-  }, [spotsRecommendation, finalItinerary, loading, apiMsg]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [step]);
 
-  // 全域 Enter 鍵流暢控制機制（修復第三步輸入框按 Enter 沒反應的問題）
+  useEffect(() => {
+    if (!loading && step === 4) {
+      scrollToBottom();
+    }
+  }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
+
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if (e.key === 'Enter') {
@@ -49,7 +53,6 @@ export const Dashboard = () => {
         else if (step === 1) { e.preventDefault(); setStep(2); }
         else if (step === 2) { 
           e.preventDefault(); 
-          // 有打字才能觸發海選
           if (formData.group_size && formData.group_size.trim() !== '') {
             handleRecommendSpots(); 
           }
@@ -350,7 +353,6 @@ export const Dashboard = () => {
                     </p>
                   </div>
                 ) : (
-                  /* 已修正：縮減第五步最終行程表的段落間距 */
                   <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-2
                     prose-headings:mt-3 prose-headings:mb-1 prose-headings:font-bold prose-headings:text-slate-900
                     prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700
@@ -409,7 +411,6 @@ export const Dashboard = () => {
                         <p className="text-xs font-semibold text-emerald-600 mt-4">正在調度本地大數據與過濾篩選最佳推薦中...</p>
                       </div>
                     ) : (
-                      /* 已修正：縮減第四步海選決策建議的字體間距與段落高度 */
                       <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-2
                         prose-headings:mt-3 prose-headings:mb-1 prose-headings:font-bold prose-headings:text-slate-900
                         prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700
