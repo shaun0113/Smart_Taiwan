@@ -45,40 +45,42 @@ export const Dashboard = () => {
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
-  const getMapSrc = () => {
-    const travelMode = formData.transport === '自駕' ? 'd' : 'r';
-    const targetCity = formData.cities[0] || '臺北市';
+const getMapSrc = () => {
+  const travelMode = formData.transport === '自駕' ? 'd' : 'r';
+  const targetCity = formData.cities[0] || '臺北市';
 
-    if (step === 5 && finalItinerary) {
-      const lines = finalItinerary.split('\n');
-      let matchedSpots = [];
-      lines.forEach(line => {
-        if ((line.includes('**') || line.match(/^\d+[\.\、]/)) && line.length < 50) {
-          const cleanName = line.replace(/[\*#_`\d\.\、\-\[\]\(\)]/g, '').replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '').trim();
-          if (cleanName && cleanName.length > 1 && cleanName.length < 15 && !cleanName.includes('行程') && !cleanName.includes('第') && !cleanName.includes('天')) {
-            matchedSpots.push(cleanName);
-          }
+  if (step === 5 && finalItinerary) {
+    const lines = finalItinerary.split('\n');
+    let firstSpot = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if ((line.includes('**') || line.match(/^\d+[\.\、]/)) && line.length < 50) {
+        const cleanName = line.replace(/[\*#_`\d\.\、\-\[\]\(\)]/g, '').replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '').trim();
+        if (cleanName && cleanName.length > 1 && cleanName.length < 15 && !cleanName.includes('行程') && !cleanName.includes('第') && !cleanName.includes('天')) {
+          firstSpot = cleanName;
+          break; 
         }
-      });
-
-      if (matchedSpots.length > 0) {
-        const origin = formData.start_location;
-        const firstSpot = matchedSpots[0]; 
-        return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(firstSpot)}&dirflg=${travelMode}&output=embed`;
       }
     }
 
-    if (mapQuery && mapQuery !== formData.start_location && mapQuery !== targetCity) {
-      const cleanQuery = mapQuery.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
-      return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || mapQuery)}&z=14&output=embed`;
+    if (firstSpot) {
+      const origin = formData.start_location;
+      return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(firstSpot)}&dirflg=${travelMode}&output=embed`;
     }
+  }
 
-    if (formData.start_location === targetCity) {
-      return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&z=14&output=embed`;
-    }
+  if (mapQuery && mapQuery !== formData.start_location && mapQuery !== targetCity) {
+    const cleanQuery = mapQuery.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
+    return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || mapQuery)}&z=14&output=embed`;
+  }
 
-    return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
-  };
+  if (formData.start_location === targetCity) {
+    return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&z=14&output=embed`;
+  }
+
+  return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
+};
 
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
