@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 export const Dashboard = () => {
   const [formData, setFormData] = useState({
     start_location: '臺北市',
-    is_custom_start: false, // 🚀 新增：記錄是否啟用細部自訂出發地址
+    is_custom_start: false, // 🚀 記錄是否啟用細部自訂出發地址
     cities: ['臺北市'],
     days: 3,
     group_size: '2-4人',
@@ -46,7 +46,7 @@ export const Dashboard = () => {
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
-  // 🚀 核心重構：打通非同步瓶頸，徹底解決點第二次地圖才跑、以及多點輸入卡死的 Bug
+  // 🚀 核心重構：打通非同步瓶頸，徹底解決地圖路徑解析與樣板字串錯誤
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
@@ -70,6 +70,7 @@ export const Dashboard = () => {
         const origin = formData.start_location;
         const destination = uniqueSpots[uniqueSpots.length - 1]; 
         const waypoints = uniqueSpots.slice(0, uniqueSpots.length - 1).join('+'); 
+        // 🛠️ 已修正：改為標準 Google Maps 嵌入式導航路徑格式
         return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(destination)}&to=${encodeURIComponent(waypoints)}&dirflg=${travelMode}&output=embed`;
       }
     }
@@ -77,15 +78,18 @@ export const Dashboard = () => {
     // 防禦機制：如果使用者在意見微調輸入多個景點，自動切分清洗，只拿第一個有效景點去渲染地圖，防止地圖卡死
     if (mapQuery && mapQuery !== formData.start_location && mapQuery !== targetCity) {
       const cleanQuery = mapQuery.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
+      // 🛠️ 已修正：改為標準單點搜尋 Embed 格式
       return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || mapQuery)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     }
 
     // 初始步驟導航：若起點與第一個目的地相同，單純看該城市景點
     if (formData.start_location === targetCity) {
-      return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&output=embed`;
+      // 🛠️ 已修正：改為標準單點搜尋 Embed 格式
+      return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     }
 
     // 跨縣市導航預覽線條
+    // 🛠️ 已修正：改為標準兩點導航 Embed 格式
     return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
   };
 
@@ -154,11 +158,12 @@ export const Dashboard = () => {
         setApiMsg("請檢閱左側由資料庫海選出的 AI 決策建議名單。您可以在右側控制台輸入偏好進行調整，滿意後請點選『確定編排行程表』！");
         setMapQuery(formData.cities[0]);
       } else {
+        console.error("海選景點失敗，後端回傳資料:", data);
         setErrorMsg(`海選景點失敗：${data.detail || JSON.stringify(data)}`);
         setStep(3);
       }
     } catch (error) {
-      console.error(error);
+      console.error("海選景點連線發生例外異常:", error);
       setErrorMsg("景點海選連線失敗，請確認 Render 後端雲端服務是否正常啟動。");
       setStep(3);
     } finally {
@@ -197,10 +202,11 @@ export const Dashboard = () => {
           await handleGenerateFinal(data.accumulated_spots);
         }
       } else {
+        console.error("意見微調失敗，後端回傳資料:", data);
         setErrorMsg(`意見微調失敗：${data.detail || JSON.stringify(data)}`);
       }
     } catch (error) {
-      console.error(error);
+      console.error("意見微調發送例外異常:", error);
       setErrorMsg("微調意見發送失敗，請檢查雲端後端連線。");
     } finally {
       setLoading(false);
@@ -231,10 +237,11 @@ export const Dashboard = () => {
         setFinalItinerary(data.result);
         setStep(5); 
       } else {
+        console.error("最終行程生成失敗，後端回傳資料:", data);
         setErrorMsg(`最終行程生成失敗：${data.detail || JSON.stringify(data)}`);
       }
     } catch (err) {
-      console.error("前端網絡請求發生錯誤:", err);
+      console.error("前端網絡請求發生錯誤例外:", err);
       setErrorMsg(`最終行程表生成失敗。原因：${err.message}`);
     } finally {
       setLoading(false);
@@ -265,10 +272,11 @@ export const Dashboard = () => {
         setFinalItinerary(data.result);
         setUserChoice(""); 
       } else {
+        console.error("微調行程失敗，後端回傳資料:", data);
         setErrorMsg(`微調行程失敗：${data.detail || JSON.stringify(data)}`);
       }
     } catch (error) {
-      console.error(error);
+      console.error("行程表微調請求例外異常:", error);
       setErrorMsg("行程表微調請求失敗，請確認 Render 後端雲端服務是否正常。");
     } finally {
       setLoading(false);
@@ -324,7 +332,7 @@ export const Dashboard = () => {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
               <h2 className="text-base font-bold text-slate-900 mb-2">🗺️ 智慧串聯拓撲導航（出發地 ➔ 停靠景點 ➔ 終點）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen></iframe>
+                <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Navigation"></iframe>
               </div>
             </div>
 
@@ -366,7 +374,7 @@ export const Dashboard = () => {
               <div className="mt-6 border-t border-slate-100 pt-5 no-print">
                 <h3 className="text-sm font-bold text-slate-800 mb-2"> 對行程不滿意？你想修改哪裡：</h3>
                 <form onSubmit={handleModifyItinerary} className="flex gap-2">
-                  <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder={loading ? "正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排鬆一點..."} className="flex-1 text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
+                  <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder={loading ? "正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排鬆一點..."} className="w-full text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
                   <button type="submit" disabled={loading || !userChoice.trim()} className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 shadow-md shadow-emerald-600/10 transition-all">{loading ? "修改中..." : "送出修改需求"}</button>
                 </form>
               </div>
@@ -438,7 +446,7 @@ export const Dashboard = () => {
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
                 
-                {/* 🚀 第一步：起點出發地設定 (新增細部自訂輸入框切換) */}
+                {/* 第一步：起點出發地設定 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
@@ -449,7 +457,7 @@ export const Dashboard = () => {
                           onClick={() => setFormData({ ...formData, is_custom_start: !formData.is_custom_start, start_location: '臺北市' })}
                           className="text-xs font-bold text-emerald-600 hover:text-emerald-700 underline"
                         >
-                          {formData.is_custom_start ? "切换縣市選單" : "⌨️ 輸入精確地址/地標"}
+                          {formData.is_custom_start ? "切換縣市選單" : "⌨️ 輸入精確地址/地標"}
                         </button>
                       </div>
                       <p className="text-xs text-slate-500 mb-4">系統將以此起點精確估算第一天的路徑開車與大眾運輸時間。</p>
@@ -561,7 +569,7 @@ export const Dashboard = () => {
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第四步：成員設定</h2>
                       <p className="text-xs text-slate-500 mb-4">請輸入本次旅遊的人數或成員結構（例如：3人、獨旅、5人公司出遊）</p>
-                      <div className="mt-2"><input type="text" placeholder="例如：2-4人、獨旅、家族旅遊10人..." value={formData.group_size || ''} onChange={(e) => setFormData({ ...formData, group_size: e.target.value })} className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" autoFocus /></div>
+                      <div className="mt-2"><input type="text" placeholder="例如：2-4人、獨旅、家族旅遊10人..." value={formData.group_size || ''} onChange={(e) => setFormData({ ...formData, group_size: e.target.value })} className="w-full text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" autoFocus /></div>
                     </div>
                     <div className="flex justify-between mt-6"><button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button><button onClick={handleRecommendSpots} disabled={!formData.group_size || formData.group_size.trim() === ''} className={`px-5 py-2 rounded-lg text-sm font-bold text-white transition-colors ${(!formData.group_size || formData.group_size.trim() === '') ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}>開始海選景點！</button></div>
                   </div>
@@ -574,7 +582,7 @@ export const Dashboard = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                   <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖智慧導航（即時連動）</h2>
                   <div className="h-[240px] rounded-xl overflow-hidden border border-slate-100">
-                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen></iframe>
+                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Live Map Preview"></iframe>
                   </div>
                 </div>
 
@@ -586,7 +594,7 @@ export const Dashboard = () => {
 
                   <div className="flex flex-col gap-3">
                     <form onSubmit={handleAnalyzeSelection} className="flex gap-2">
-                      <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="例如：某些景點不要去、加入特定新景點..." className="flex-1 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
+                      <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="例如：某些景點不要去、加入特定新景點..." className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
                       <button type="submit" disabled={loading || !userChoice.trim()} className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 transition-colors">送出意見</button>
                     </form>
 
@@ -610,7 +618,7 @@ export const Dashboard = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5">
                   <h2 className="text-base font-bold text-slate-900 mb-1">區域地圖智慧導航（動態路線預覽）</h2>
                   <div className="mt-2 h-52 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen></iframe>
+                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Initial Map Preview"></iframe>
                   </div>
                 </div>
 
