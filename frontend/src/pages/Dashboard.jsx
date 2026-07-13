@@ -6,7 +6,7 @@ export const Dashboard = () => {
     start_location: '臺北市', 
     cities: ['臺北市'],
     days: 3,
-    group_size: '2-4人',
+    group_size: '4人',
     tags: [],
     transport: '自駕',
     start_time: '08:00'
@@ -25,8 +25,9 @@ export const Dashboard = () => {
   
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // 地圖即時定位狀態
   const [mapQuery, setMapQuery] = useState('臺北市');
+
+  const [selectedSpots, setSelectedSpots] = useState([]);
 
   const resultEndRef = useRef(null);
   const itineraryRef = useRef(null);
@@ -45,21 +46,13 @@ export const Dashboard = () => {
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
-  // 🚀 核心升級：智慧多點停靠路徑地圖生成器
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
 
-    // 🌟 功能二修復：如果是在最後一步（最終行程頁），自動解析 AI 排出的景點順序，轉化為 Google 停靠站導航
     if (step === 5 && finalItinerary) {
-      // 利用正則表達式，把 Markdown 內被粗體 ** 包裹的景點名稱或是數字標題後面的中文名稱撈出來
-      const regex = /(?:單日行程|第\s*\d+\s*天|景點|📍|🐾)[:：\-\s]*([^\n\*\-\d\(\)\（\）]+)/g;
-      let matchedSpots = [];
-      let match;
-      
-      // 簡單提取行程內可能出現的景點關鍵字
       const lines = finalItinerary.split('\n');
+      let matchedSpots = [];
       lines.forEach(line => {
-        // 如果行內含有具體景點指標（例如以數字開頭、有粗體，且字數適中的地名）
         if ((line.includes('**') || line.match(/^\d+[\.\、]/)) && line.length < 50) {
           const cleanName = line.replace(/[\*#_`\d\.\、\-\[\]\(\)]/g, '').replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '').trim();
           if (cleanName && cleanName.length > 1 && cleanName.length < 15 && !cleanName.includes('行程') && !cleanName.includes('第') && !cleanName.includes('天')) {
@@ -68,20 +61,16 @@ export const Dashboard = () => {
         }
       });
 
-      // 去除重複景點
-      const uniqueSpots = [...new Set(matchedSpots)].slice(0, 8); // Google Embed 限制上限約 8 個停靠點
+      const uniqueSpots = [...new Set(matchedSpots)].slice(0, 8); 
 
       if (uniqueSpots.length > 0) {
         const origin = formData.start_location;
-        const destination = uniqueSpots[uniqueSpots.length - 1]; // 最後一個景點作為終點
-        const waypoints = uniqueSpots.slice(0, uniqueSpots.length - 1).join('+'); // 中間的景點當作停靠站
-
-        // 串接成 Google Maps 多點導航網址
+        const destination = uniqueSpots[uniqueSpots.length - 1]; 
+        const waypoints = uniqueSpots.slice(0, uniqueSpots.length - 1).join('+'); 
         return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(destination)}&to=${encodeURIComponent(waypoints)}&dirflg=${travelMode}&output=embed`;
       }
     }
 
-    // 基礎海選步驟地圖邏輯
     if (mapQuery && mapQuery !== formData.start_location && mapQuery !== formData.cities[0]) {
       return `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     }
@@ -91,6 +80,28 @@ export const Dashboard = () => {
     }
 
     return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(formData.cities[0])}&dirflg=${travelMode}&output=embed`;
+  };
+
+  const handleSpotCheckboxChange = (spotName) => {
+    const cleanName = spotName.replace(/[【】\s\d\.\、]/g, '');
+    let newSelected = [...selectedSpots];
+    
+    if (newSelected.includes(cleanName)) {
+      newSelected = newSelected.filter(name => name !== cleanName);
+      const updatedAccumulated = accumulatedSpots
+        .split('+')
+        .map(s => s.trim())
+        .filter(s => s !== `想去 ${cleanName}`)
+        .join(' + ');
+      setAccumulatedSpots(updatedAccumulated);
+    } else {
+      newSelected.push(cleanName);
+      setMapQuery(cleanName);
+      setUserChoice(`想去 ${cleanName}`);
+      const currentAccumulated = accumulatedSpots && accumulatedSpots.trim() !== "" ? accumulatedSpots + ' + ' : '';
+      setAccumulatedSpots(currentAccumulated + `想去 ${cleanName}`);
+    }
+    setSelectedSpots(newSelected);
   };
 
   useEffect(() => {
@@ -151,6 +162,7 @@ export const Dashboard = () => {
         setAccumulatedSpots(data.accumulated_spots || "");
         setApiMsg("請檢閱左側由資料庫海選出的 AI 決策建議名單。您可以在右側控制台輸入偏好進行調整，滿意後請點選『確定編排行程表』！");
         setMapQuery(formData.cities[0]);
+        setSelectedSpots([]); // 重置勾選
       } else {
         setErrorMsg(`海選景點失敗：${data.detail || JSON.stringify(data)}`);
         setStep(3);
@@ -320,8 +332,7 @@ export const Dashboard = () => {
         {step === 5 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              {/* 🌟 標題更新：呈現多點穿插的視覺驚喜 */}
-              <h2 className="text-base font-bold text-slate-900 mb-2">🗺️ 智慧串聯拓撲導航（出發地 ➔ 停靠景點 ➔ 終點）</h2>
+              <h2 className="text-base font-bold text-slate-990 mb-2">智慧串聯拓撲導航（出發地 ➔ 停靠景點 ➔ 終點）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen></iframe>
               </div>
@@ -377,7 +388,7 @@ export const Dashboard = () => {
             {step === 4 ? (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[580px] lg:col-span-1 animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
-                  <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">💡 智慧旅遊決策建議</h2>
+                  <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2"> 智慧旅遊決策建議</h2>
                   
                   <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 whitespace-pre-line tracking-wide">
                     {loading ? (
@@ -387,20 +398,28 @@ export const Dashboard = () => {
                       </div>
                     ) : (
                       <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-2 prose-headings:mt-3 prose-headings:mb-1 prose-headings:font-bold prose-headings:text-slate-900 prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700 prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1 prose-li:my-0.5">
-                        {/* 🌟 功能一優化：為渲染出來的景點名稱加上「點擊地圖聯動」的互動按鈕 */}
                         <ReactMarkdown 
                           components={{
                             h3: ({node, ...props}) => {
                               const titleText = props.children?.toString() || "";
+                              const cleanSpotName = titleText.replace(/[【】\s\d\.\、]/g, '');
+                              const isChecked = selectedSpots.includes(cleanSpotName);
                               return (
-                                <div className="flex items-center justify-between gap-2 mt-4 mb-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                  <h3 className="text-sm font-bold text-slate-900 !m-0">{titleText}</h3>
-                                  <button 
-                                    onClick={() => setMapQuery(titleText.replace(/[【】]/g, ''))}
-                                    className="px-2.5 py-1 text-[10px] font-bold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-500 hover:text-white transition-all shadow-xs cursor-pointer"
-                                  >
-                                    🗺️ 地圖定位
-                                  </button>
+                                <div 
+                                  onClick={() => handleSpotCheckboxChange(cleanSpotName)}
+                                  className={`flex items-center gap-3 mt-4 mb-2 p-3 rounded-xl border cursor-pointer select-none transition-all
+                                    ${isChecked ? 'bg-emerald-55 border-emerald-300 shadow-xs' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}
+                                >
+                                  <input 
+                                    type="checkbox" 
+                                    checked={isChecked}
+                                    onChange={() => {}} 
+                                    className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
+                                  />
+                                  <h3 className="text-sm font-bold text-slate-900 !m-0 flex-1">{titleText}</h3>
+                                  <span className="text-[10px] font-bold text-slate-400">
+                                    {isChecked ? " 已勾選聯動" : " 點擊勾選定位"}
+                                  </span>
                                 </div>
                               )
                             }
@@ -491,7 +510,7 @@ export const Dashboard = () => {
                         </div>
                         <div className="mt-2">
                           <input type="text" placeholder="請輸入其他旅遊目的，輸入完按 Enter 新增標籤" className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" onKeyDown={(e) => { if (e.key === 'Enter' && e.target.value.trim() !== '') { e.preventDefault(); const newTag = e.target.value.trim(); let currentTags = formData.tags ? [...formData.tags] : []; if (!currentTags.includes(newTag)) { currentTags.push(newTag); } setFormData({ ...formData, tags: currentTags }); e.target.value = ''; } }} />
-                          <p className="text-[10px] text-slate-400 mt-1">💡 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
+                          <p className="text-[10px] text-slate-400 mt-1"> 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
                           <div className="flex flex-wrap gap-1 mt-2">
                             {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].includes(t)).map(customTag => (
                               <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) }); }}>×</button></span>
