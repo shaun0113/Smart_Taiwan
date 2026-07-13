@@ -39,58 +39,60 @@ export const Dashboard = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
 
+  
   useEffect(() => {
-    if (!loading && step === 5) { 
+    if (!loading && step === 4) { 
       scrollToBottom();
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
-const getMapSrc = () => {
-  const travelMode = formData.transport === '自駕' ? 'd' : 'r';
-  const targetCity = formData.cities[0] || '臺北市';
+  
+  const getMapSrc = () => {
+    const travelMode = formData.transport === '自駕' ? 'd' : 'r';
+    const targetCity = formData.cities[0] || '臺北市';
 
-  if (step === 5 && finalItinerary) {
-    const lines = finalItinerary.split('\n');
-    let firstSpot = null;
+    if (step === 5 && finalItinerary) {
+      const lines = finalItinerary.split('\n');
+      let firstSpot = null;
 
-    for (let i = 0; i < lines.length; i++) {
-      const cleanLine = lines[i]
-        .replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '')
-        .replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '')
-        .trim();
+      for (let i = 0; i < lines.length; i++) {
+        const cleanLine = lines[i]
+          .replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '')
+          .replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '')
+          .trim();
 
-      if (
-        cleanLine.length > 1 && 
-        cleanLine.length < 15 && 
-        !cleanLine.includes('行程') && 
-        !cleanLine.includes('第') && 
-        !cleanLine.includes('天') && 
-        !cleanLine.includes('好的') && 
-        !cleanLine.includes('歡迎') &&
-        !cleanLine.includes('摘要')
-      ) {
-        firstSpot = cleanLine;
-        break; 
+        if (
+          cleanLine.length > 1 && 
+          cleanLine.length < 15 && 
+          !cleanLine.includes('行程') && 
+          !cleanLine.includes('第') && 
+          !cleanLine.includes('天') && 
+          !cleanLine.includes('好的') && 
+          !cleanLine.includes('歡迎') &&
+          !cleanLine.includes('摘要')
+        ) {
+          firstSpot = cleanLine;
+          break; 
+        }
+      }
+
+      if (firstSpot) {
+        const origin = formData.start_location;
+        return `https://maps.google.com/maps?q=${encodeURIComponent(origin)}+to+${encodeURIComponent(firstSpot)}&saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(firstSpot)}&dirflg=${travelMode}&output=embed`;
       }
     }
 
-    if (firstSpot) {
-      const origin = formData.start_location;
-      return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(firstSpot)}&dirflg=${travelMode}&output=embed`;
+    if (mapQuery && mapQuery !== formData.start_location && mapQuery !== targetCity) {
+      const cleanQuery = mapQuery.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
+      return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || mapQuery)}&z=14&output=embed`;
     }
-  }
 
-  if (mapQuery && mapQuery !== formData.start_location && mapQuery !== targetCity) {
-    const cleanQuery = mapQuery.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
-    return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || mapQuery)}&z=14&output=embed`;
-  }
+    if (formData.start_location === targetCity) {
+      return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&z=14&output=embed`;
+    }
 
-  if (formData.start_location === targetCity) {
-    return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&z=14&output=embed`;
-  }
-
-  return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
-};
+    return `https://maps.google.com/maps?q=${encodeURIComponent(formData.start_location)}+to+${encodeURIComponent(targetCity)}&saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
+  };
 
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
@@ -163,7 +165,7 @@ const getMapSrc = () => {
       }
     } catch (error) {
       console.error("海選景點連線發生例外異常:", error);
-      setErrorMsg("景點海選連線失敗，請確認 Render 後端雲端服務是否正常充動。");
+      setErrorMsg("景點海選連線失敗，請確認 Render 後端雲端服務是否正常啟動。");
       setStep(3);
     } finally {
       setLoading(false);
@@ -440,7 +442,6 @@ const getMapSrc = () => {
               </section>
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
-                {/* 第一步：起點出發地設定 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
@@ -570,7 +571,7 @@ const getMapSrc = () => {
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第四步：成員設定</h2>
                       <p className="text-xs text-slate-500 mb-4">請輸入本次旅遊的人數或成員結構（例如：3人、獨旅、5人公司出遊）</p>
-                      <div className="mt-2"><input type="text" placeholder="例如：2-4人、獨旅、家族旅遊10人..." value={formData.group_size || ''} onChange={(e) => setFormData({ ...formData, group_size: e.target.value })} className="w-full text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" autoFocus /></div>
+                      <div className="mt-2"><input type="text" placeholder="例如：2-4人、獨旅、家族旅遊10人..." value={formData.group_size || ''} onChange={(e) => setFormData({ ...formData, group_size: e.target.value })} className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" autoFocus /></div>
                     </div>
                     <div className="flex justify-between mt-6"><button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button><button onClick={handleRecommendSpots} disabled={!formData.group_size || formData.group_size.trim() === ''} className={`px-5 py-2 rounded-lg text-sm font-bold text-white transition-colors ${(!formData.group_size || formData.group_size.trim() === '') ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}>開始海選景點！</button></div>
                   </div>
