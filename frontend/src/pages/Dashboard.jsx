@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 export const Dashboard = () => {
   const [formData, setFormData] = useState({
     start_location: '臺北市',
+    is_custom_start: false, // 🚀 新增：記錄是否啟用細部自訂出發地址
     cities: ['臺北市'],
     days: 3,
     group_size: '2-4人',
@@ -23,7 +24,6 @@ export const Dashboard = () => {
   const [userChoice, setUserChoice] = useState('');
   const [finalItinerary, setFinalItinerary] = useState('');
   
-  // 控制複製成功提示的狀態
   const [copySuccess, setCopySuccess] = useState(false);
 
   // 地圖即時定位狀態
@@ -46,11 +46,12 @@ export const Dashboard = () => {
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
-  // 智慧多點停靠路徑地圖生成器
+  // 🚀 核心重構：打通非同步瓶頸，徹底解決點第二次地圖才跑、以及多點輸入卡死的 Bug
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
+    const targetCity = formData.cities[0] || '臺北市';
 
-    // 最終行程頁：自動解析 AI 排出的景點順序，轉化為 Google 停靠站導航
+    // 第五步（最終行程頁）：智慧多點停靠路徑導航
     if (step === 5 && finalItinerary) {
       const lines = finalItinerary.split('\n');
       let matchedSpots = [];
@@ -73,16 +74,19 @@ export const Dashboard = () => {
       }
     }
 
-    // 基礎海選步驟與即時按鈕聯動地圖邏輯
-    if (mapQuery && mapQuery !== formData.start_location && mapQuery !== formData.cities[0]) {
-      return `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+    // 防禦機制：如果使用者在意見微調輸入多個景點，自動切分清洗，只拿第一個有效景點去渲染地圖，防止地圖卡死
+    if (mapQuery && mapQuery !== formData.start_location && mapQuery !== targetCity) {
+      const cleanQuery = mapQuery.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
+      return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || mapQuery)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     }
 
-    if (formData.start_location === formData.cities[0]) {
-      return `https://maps.google.com/maps?q=${encodeURIComponent(formData.cities[0] + ' 景點')}&output=embed`;
+    // 初始步驟導航：若起點與第一個目的地相同，單純看該城市景點
+    if (formData.start_location === targetCity) {
+      return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&output=embed`;
     }
 
-    return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(formData.cities[0])}&dirflg=${travelMode}&output=embed`;
+    // 跨縣市導航預覽線條
+    return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
   };
 
   useEffect(() => {
@@ -111,9 +115,15 @@ export const Dashboard = () => {
     const currentList = [...formData[field]];
     if (currentList.includes(value)) {
       if (field === 'cities' && currentList.length === 1) return; 
-      setFormData({ ...formData, [field]: currentList.filter(item => item !== value) });
+      // 🚀 核心優化：如果取消了原本排在第一位的城市，地圖立刻切換到新清單的第一位，阻斷延遲
+      const remaining = currentList.filter(item => item !== value);
+      setFormData({ ...formData, [field]: remaining });
+      setMapQuery(remaining[0] || formData.start_location);
     } else {
-      setFormData({ ...formData, [field]: [...currentList, value] });
+      const newList = [...currentList, value];
+      setFormData({ ...formData, [field]: newList });
+      // 🚀 核心優化：新勾選城市時，地圖立刻強制同步聚焦到該新加入的城市，徹底解決點兩次 Bug
+      setMapQuery(value);
     }
   };
 
@@ -428,21 +438,56 @@ export const Dashboard = () => {
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
                 
+                {/* 🚀 第一步：起點出發地設定 (新增細部自訂輸入框切換) */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
-                      <h2 className="text-base font-bold text-slate-900 mb-1">第一步：你的出發地在哪裡？（單選）</h2>
-                      <p className="text-xs text-slate-500 mb-4">系統將以此出發點精確估算第一天起點與交通路線時間。</p>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px] pr-1">
-                        {["基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣"].map(city => {
-                          const isSelected = formData.start_location === city;
-                          return (
-                            <div key={city} onClick={() => { setFormData({ ...formData, start_location: city }); setMapQuery(city); }} className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}>{city}</div>
-                          );
-                        })}
+                      <div className="flex justify-between items-center mb-1">
+                        <h2 className="text-base font-bold text-slate-900">第一步：你的出發地在哪裡？</h2>
+                        <button 
+                          type="button"
+                          onClick={() => setFormData({ ...formData, is_custom_start: !formData.is_custom_start, start_location: '臺北市' })}
+                          className="text-xs font-bold text-emerald-600 hover:text-emerald-700 underline"
+                        >
+                          {formData.is_custom_start ? "切换縣市選單" : "⌨️ 輸入精確地址/地標"}
+                        </button>
                       </div>
+                      <p className="text-xs text-slate-500 mb-4">系統將以此起點精確估算第一天的路徑開車與大眾運輸時間。</p>
+                      
+                      {formData.is_custom_start ? (
+                        <div className="mt-2 animate-fadeIn">
+                          <input 
+                            type="text" 
+                            value={formData.start_location}
+                            onChange={(e) => {
+                              setFormData({ ...formData, start_location: e.target.value });
+                              setMapQuery(e.target.value);
+                            }}
+                            placeholder="請輸入精確起點名稱（例如：台北車站、逢甲大學、新竹高鐵站）..."
+                            className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
+                          />
+                          <p className="text-[10px] text-slate-400 mt-2">💡 精確地址可以包含地標名稱，右側地圖會即時為您測試定位解析線條。</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px] pr-1 animate-fadeIn">
+                          {["基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣"].map(city => {
+                            const isSelected = formData.start_location === city;
+                            return (
+                              <div key={city} onClick={() => { setFormData({ ...formData, start_location: city }); setMapQuery(city); }} className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}>{city}</div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                    <div className="flex justify-end mt-4"><button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all">下一步</button></div>
+                    <div className="flex justify-end mt-4">
+                      <button 
+                        onClick={() => setStep(1)} 
+                        disabled={!formData.start_location.trim()}
+                        className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all disabled:bg-slate-300 disabled:cursor-not-allowed"
+                      >
+                        下一步
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -454,7 +499,7 @@ export const Dashboard = () => {
                         {["基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣", "澎湖縣", "金門縣", "連江縣"].map(city => {
                           const isSelected = formData.cities.includes(city);
                           return (
-                            <div key={city} onClick={() => { handleCheckboxChange('cities', city); setMapQuery(city); }} className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-md font-bold' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}>{city}</div>
+                            <div key={city} onClick={() => handleCheckboxChange('cities', city)} className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-md font-bold' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}>{city}</div>
                           );
                         })}
                       </div>
@@ -541,7 +586,7 @@ export const Dashboard = () => {
 
                   <div className="flex flex-col gap-3">
                     <form onSubmit={handleAnalyzeSelection} className="flex gap-2">
-                      <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="例如：輸入特定想查看的景點，地圖會即時切換定位..." className="flex-1 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
+                      <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="例如：某些景點不要去、加入特定新景點..." className="flex-1 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
                       <button type="submit" disabled={loading || !userChoice.trim()} className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 transition-colors">送出意見</button>
                     </form>
 
@@ -585,5 +630,3 @@ export const Dashboard = () => {
     </div>
   );
 };
-
-export default Dashboard;
