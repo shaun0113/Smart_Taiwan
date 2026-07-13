@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 export const Dashboard = () => {
   const [formData, setFormData] = useState({
     start_location: '臺北市',
-    is_custom_start: false, // 🚀 新增：記錄是否啟用細部自訂出發地址
+    is_custom_start: false, // 🚀 記錄是否啟用細部自訂出發地址
     cities: ['臺北市'],
     days: 3,
     group_size: '2-4人',
@@ -46,8 +46,7 @@ export const Dashboard = () => {
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
-  // 🚀 核心重構：打通非同步瓶頸，徹底解決點第二次地圖才跑、以及多點輸入卡死的 Bug
-  // 🛠️ 已修正：將原本錯誤的字串拼接改為標準樣板字串 (Template Literals)
+  // 🚀 核心重構：打通非同步瓶頸，徹底解決地圖路徑解析與樣板字串錯誤
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
@@ -71,6 +70,7 @@ export const Dashboard = () => {
         const origin = formData.start_location;
         const destination = uniqueSpots[uniqueSpots.length - 1]; 
         const waypoints = uniqueSpots.slice(0, uniqueSpots.length - 1).join('+'); 
+        // 🛠️ 已修正：移除非官方路徑，將 3{} 改為正確的 ${} 變數嵌入，採用標準 Google Maps 導航格式
         return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(destination)}&to=${encodeURIComponent(waypoints)}&dirflg=${travelMode}&output=embed`;
       }
     }
@@ -78,15 +78,18 @@ export const Dashboard = () => {
     // 防禦機制：如果使用者在意見微調輸入多個景點，自動切分清洗，只拿第一個有效景點去渲染地圖，防止地圖卡死
     if (mapQuery && mapQuery !== formData.start_location && mapQuery !== targetCity) {
       const cleanQuery = mapQuery.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
+      // 🛠️ 已修正：將 0{} 改為正確的 ${} 單點搜尋格式
       return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || mapQuery)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     }
 
     // 初始步驟導航：若起點與第一個目的地相同，單純看該城市景點
     if (formData.start_location === targetCity) {
-      return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&output=embed`;
+      // 🛠️ 已修正：將 0{} 改為正確的 ${} 格式
+      return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     }
 
     // 跨縣市導航預覽線條
+    // 🛠️ 已修正：將 3{} 改為正確的 ${} 導航格式
     return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
   };
 
@@ -155,11 +158,13 @@ export const Dashboard = () => {
         setApiMsg("請檢閱左側由資料庫海選出的 AI 決策建議名單。您可以在右側控制台輸入偏好進行調整，滿意後請點選『確定編排行程表』！");
         setMapQuery(formData.cities[0]);
       } else {
+        // 🛠️ 補強：將詳細的後端錯誤資料輸出至 F12 瀏覽器 Log 中
+        console.error("海選景點失敗，後端回傳資料:", data);
         setErrorMsg(`海選景點失敗：${data.detail || JSON.stringify(data)}`);
         setStep(3);
       }
     } catch (error) {
-      console.error(error);
+      console.error("海選景點連線發生例外異常:", error);
       setErrorMsg("景點海選連線失敗，請確認 Render 後端雲端服務是否正常啟動。");
       setStep(3);
     } finally {
@@ -198,10 +203,12 @@ export const Dashboard = () => {
           await handleGenerateFinal(data.accumulated_spots);
         }
       } else {
+        // 🛠️ 補強：將詳細的後端錯誤資料輸出至 F12 瀏覽器 Log 中
+        console.error("意見微調失敗，後端回傳資料:", data);
         setErrorMsg(`意見微調失敗：${data.detail || JSON.stringify(data)}`);
       }
     } catch (error) {
-      console.error(error);
+      console.error("意見微調發送例外異常:", error);
       setErrorMsg("微調意見發送失敗，請檢查雲端後端連線。");
     } finally {
       setLoading(false);
@@ -232,10 +239,12 @@ export const Dashboard = () => {
         setFinalItinerary(data.result);
         setStep(5); 
       } else {
+        // 🛠️ 補強：將詳細的後端錯誤資料輸出至 F12 瀏覽器 Log 中
+        console.error("最終行程生成失敗，後端回傳資料:", data);
         setErrorMsg(`最終行程生成失敗：${data.detail || JSON.stringify(data)}`);
       }
     } catch (err) {
-      console.error("前端網絡請求發生錯誤:", err);
+      console.error("前端網絡請求發生錯誤例外:", err);
       setErrorMsg(`最終行程表生成失敗。原因：${err.message}`);
     } finally {
       setLoading(false);
@@ -266,10 +275,12 @@ export const Dashboard = () => {
         setFinalItinerary(data.result);
         setUserChoice(""); 
       } else {
+        // 🛠️ 補強：將詳細的後端錯誤資料輸出至 F12 瀏覽器 Log 中
+        console.error("微調行程失敗，後端回傳資料:", data);
         setErrorMsg(`微調行程失敗：${data.detail || JSON.stringify(data)}`);
       }
     } catch (error) {
-      console.error(error);
+      console.error("行程表微調請求例外異常:", error);
       setErrorMsg("行程表微調請求失敗，請確認 Render 後端雲端服務是否正常。");
     } finally {
       setLoading(false);
@@ -332,7 +343,7 @@ export const Dashboard = () => {
 
             <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
-                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專專旅遊行程規劃表</h2>
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專屬旅遊行程規劃表</h2>
                 <div className="flex gap-2 items-center">
                   <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
                     出發地：{formData.start_location} | {formData.days} 天 {formData.group_size} ({formData.transport})
@@ -440,7 +451,7 @@ export const Dashboard = () => {
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
                 
-                {/* 🚀 第一步：起點出發地設定 */}
+                {/* 第一步：起點出發地設定 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
