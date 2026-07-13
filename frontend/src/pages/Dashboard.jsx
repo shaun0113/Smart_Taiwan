@@ -46,12 +46,11 @@ export const Dashboard = () => {
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
-  // 🚀 核心優化：換回完全不需要 API Key 的免簽官方嵌入格式，徹底修復 401 拒絕連線問題
+  // 🚀 核心修改點一：調整第5步地圖邏輯，精準切換為「出發地 ➔ 第一個景點」的完美導航
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
 
-    // 第五步（最終行程頁）：智慧多點停靠路徑導航
     if (step === 5 && finalItinerary) {
       const lines = finalItinerary.split('\n');
       let matchedSpots = [];
@@ -64,28 +63,23 @@ export const Dashboard = () => {
         }
       });
 
-      const uniqueSpots = [...new Set(matchedSpots)].slice(0, 8); 
-
-      if (uniqueSpots.length > 0) {
+      // 🎯 核心修正：只撈出排在第一個的景點作為目的地
+      if (matchedSpots.length > 0) {
         const origin = formData.start_location;
-        const destination = uniqueSpots[uniqueSpots.length - 1]; 
-        const waypoints = uniqueSpots.slice(0, uniqueSpots.length - 1).join('+'); 
-        return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(destination)}&to=${encodeURIComponent(waypoints)}&dirflg=${travelMode}&output=embed`;
+        const firstSpot = matchedSpots[0]; // 拿取第一個景點
+        return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(firstSpot)}&dirflg=${travelMode}&output=embed`;
       }
     }
 
-    // 防禦機制：如果使用者在意見微調輸入多個景點
     if (mapQuery && mapQuery !== formData.start_location && mapQuery !== targetCity) {
       const cleanQuery = mapQuery.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
-      return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || mapQuery)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+      return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || mapQuery)}&z=14&output=embed`;
     }
 
-    // 初始步驟導航：若起點與第一個目的地相同
     if (formData.start_location === targetCity) {
-      return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+      return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&z=14&output=embed`;
     }
 
-    // 跨縣市導航預覽
     return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
   };
 
@@ -326,7 +320,7 @@ export const Dashboard = () => {
         {step === 5 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="text-base font-bold text-slate-900 mb-2">🗺️ 智慧串聯拓撲導航（出發地 ➔ 停靠景點 ➔ 終點）</h2>
+              <h2 className="text-base font-bold text-slate-900 mb-2">🗺️ 智慧啟程導航（出發地 ➔ 目的地首站）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Navigation"></iframe>
               </div>
@@ -377,7 +371,7 @@ export const Dashboard = () => {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             
             {step === 4 ? (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[580px] lg:col-span-1 animate-fadeIn">
@@ -395,7 +389,6 @@ export const Dashboard = () => {
                         <ReactMarkdown 
                           components={{
                             p: ({node, children}) => {
-                              // 🚀 核心安全防禦：將 children 強制轉換為陣列，徹底消滅 .some() 的白屏地雷
                               const childrenArray = Array.isArray(children) ? children : [children];
                               const hasSpot = childrenArray.some(child => 
                                 child?.props?.children && 
@@ -443,7 +436,6 @@ export const Dashboard = () => {
               </section>
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
-                
                 {/* 第一步：起點出發地設定 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
@@ -559,7 +551,7 @@ export const Dashboard = () => {
                           <p className="text-[10px] text-slate-400 mt-1">💡 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
                           <div className="flex flex-wrap gap-1 mt-2">
                             {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].includes(t)).map(customTag => (
-                              <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2.5 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) }); }}>×</button></span>
+                              <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) }); }}>×</button></span>
                             ))}
                           </div>
                         </div>
@@ -583,7 +575,8 @@ export const Dashboard = () => {
             )}
 
             {step === 4 ? (
-              <section className="flex flex-col gap-6 lg:col-span-1 animate-fadeIn">
+              /* 🚀 核心修改點二：加入 lg:sticky lg:top-6，讓地圖和控制台跟隨畫面滾動常駐在右邊！ */
+              <section className="flex flex-col gap-6 lg:col-span-1 animate-fadeIn lg:sticky lg:top-6">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                   <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖智慧導航（即時連動）</h2>
                   <div className="h-[240px] rounded-xl overflow-hidden border border-slate-100">
