@@ -26,7 +26,6 @@ export const Dashboard = () => {
   
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // 地圖即時定位狀態
   const [mapQuery, setMapQuery] = useState('臺北市');
 
   const resultEndRef = useRef(null);
@@ -40,14 +39,12 @@ export const Dashboard = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
 
-  // 只在 step === 4（海選微調頁）執行自動置底，第6步最終行程表產出時保持在最頂端
   useEffect(() => {
     if (!loading && step === 4) { 
       scrollToBottom();
     }
   }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
 
-  // 🚀 終極識別上演算法：精準拔除「午餐/晚餐/點心」等前綴干擾，並強制綁定縣市關鍵字，防止跨縣市亂導航
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
@@ -59,21 +56,15 @@ export const Dashboard = () => {
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         
-        // 1. 識別帶有時間格式的行
         if (line.match(/\d{2}:\d{2}/) && (line.includes('-') || line.includes('─') || line.includes('～'))) {
-          // 切除時間文字
           let cleanName = line.replace(/^\d{2}:\d{2}\s*[-─～]\s*\d{2}:\d{2}/, '').trim();
-          
-          // 🎯 關鍵優化：徹底拔除「午餐：」、「晚餐：」、「點心：」、「推薦：」、「景點：」等常見前綴結構
           cleanName = cleanName.replace(/^(午餐|晚餐|點心|早餐|下午茶|景點|推薦|行程)[:：\s]*/, '').trim();
 
-          // 去除殘留的 Markdown 標籤與特殊符號
           cleanName = cleanName
             .replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '')
             .replace(/^(前往|出發前往|到|至|抵達)/, '')
             .trim();
 
-          // 排除不屬於真實景點的目的地敘述行
           if (
             cleanName.length > 1 && 
             cleanName.length < 20 && 
@@ -83,7 +74,7 @@ export const Dashboard = () => {
             !cleanName.includes('高鐵') &&
             !cleanName.includes('飯店') &&
             !cleanName.includes('入住') &&
-            !cleanName.includes(formData.start_location) // 排除起點自身
+            !cleanName.includes(formData.start_location)
           ) {
             firstSpot = cleanName;
             break; 
@@ -91,12 +82,30 @@ export const Dashboard = () => {
         }
       }
 
-      // 如果成功識別出景點，為了防禦 Google 地圖在異地撈同名店，強制把目標城市塞進目的地導航
+      if (!firstSpot) {
+        for (let i = 0; i < lines.length; i++) {
+          const cleanLine = lines[i]
+            .replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '')
+            .replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '')
+            .trim();
+
+          if (
+            cleanLine.length > 1 && 
+            cleanLine.length < 15 && 
+            !cleanLine.includes('行程') && !cleanLine.includes('第') && !cleanLine.includes('天') && 
+            !cleanLine.includes('好的') && !cleanLine.includes('歡迎') && !cleanLine.includes('摘要') &&
+            !cleanLine.includes('約會') && !cleanLine.includes('吃貨') && !cleanLine.includes('打卡')
+          ) {
+            firstSpot = cleanLine;
+            break;
+          }
+        }
+      }
+
       if (firstSpot) {
         const origin = formData.start_location;
-        // 如果抓出來的景點名稱開頭沒有包含該縣市，就手動幫它加上縣市限制（例如：周氏蝦捲 ➔ 臺南市周氏蝦捲）
         const secureDestination = firstSpot.includes(targetCity.substring(0, 2)) ? firstSpot : `${targetCity}${firstSpot}`;
-        return `https://maps.google.com/maps?q=${encodeURIComponent(origin)}+to+${encodeURIComponent(secureDestination)}&saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(secureDestination)}&dirflg=${travelMode}&output=embed`;
+        return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(secureDestination)}&dirflg=${travelMode}&output=embed`;
       }
     }
 
@@ -109,7 +118,7 @@ export const Dashboard = () => {
       return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&z=14&output=embed`;
     }
 
-    return `https://maps.google.com/maps?q=${encodeURIComponent(formData.start_location)}+to+${encodeURIComponent(targetCity)}&saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
+    return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
   };
 
   useEffect(() => {
@@ -313,17 +322,21 @@ export const Dashboard = () => {
   };
 
   const handlePrintPDF = () => {
-    if (!itineraryRef.current) return;
-    const printContent = itineraryRef.current.innerHTML;
-    const originalContent = document.body.innerHTML;
-    document.body.innerHTML = `<div style="padding: 40px; font-family: sans-serif; max-width: 800px; margin: 0 auto;">${printContent}</div>`;
     window.print();
-    document.body.innerHTML = originalContent;
-    window.location.reload(); 
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
+      <style>{`
+        @media print {
+          body, html { background-color: #ffffff !important; color: #000000 !important; }
+          header, .mb-6, iframe, h2, .no-print, form, h3, .mt-6 { display: none !important; }
+          main { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
+          .print-area { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
+          .bg-slate-50\\/70 { background: transparent !important; border: none !important; padding: 0 !important; }
+        }
+      `}</style>
+
       <header className="border-b bg-white shadow-sm">
         <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-800" onClick={() => setStep(0)} style={{ cursor: 'pointer' }}>
@@ -349,15 +362,15 @@ export const Dashboard = () => {
         {step === 5 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="text-base font-bold text-slate-900 mb-2">🗺️ 智慧啟程導航（出發地 ➔ 目的地首站）</h2>
+              <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（出發地 ➔ 目的地首站）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Navigation"></iframe>
               </div>
             </div>
 
-            <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col">
+            <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col print-area">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
-                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專屬旅遊行程規劃表</h2>
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">意遊台灣 專屬旅遊行程規劃表</h2>
                 <div className="flex gap-2 items-center">
                   <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
                     出發地：{formData.start_location} | {formData.days} 天 {formData.group_size} ({formData.transport})
@@ -437,7 +450,7 @@ export const Dashboard = () => {
                                       onClick={() => setMapQuery(cleanSpotName)}
                                       className="px-3 py-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap"
                                     >
-                                      🗺️ 查看景點
+                                       查看景點
                                     </button>
                                   </div>
                                 );
@@ -460,7 +473,6 @@ export const Dashboard = () => {
               </section>
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
-                {/* 第一步：起點出發地設定 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
@@ -471,7 +483,7 @@ export const Dashboard = () => {
                           onClick={() => setFormData({ ...formData, is_custom_start: !formData.is_custom_start, start_location: '臺北市' })}
                           className="text-xs font-bold text-emerald-600 hover:text-emerald-700 underline"
                         >
-                          {formData.is_custom_start ? "切換縣市選單" : "⌨️ 輸入精確地址/地標"}
+                          {formData.is_custom_start ? "切換縣市選單" : " 輸入精確地址/地標"}
                         </button>
                       </div>
                       <p className="text-xs text-slate-500 mb-4">系統將以此起點精確估算第一天的路徑開車與大眾運輸時間。</p>
@@ -495,7 +507,7 @@ export const Dashboard = () => {
                             className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
                             autoFocus
                           />
-                          <p className="text-[10px] text-slate-400 mt-2">💡 精確地址可以包含地標名稱，右側地圖會即時為您測試定位解析線條。</p>
+                          <p className="text-[10px] text-slate-400 mt-2"> 精確地址可以包含地標名稱，右側地圖會即時為您測試定位解析線條。</p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px] pr-1 animate-fadeIn">
@@ -572,7 +584,7 @@ export const Dashboard = () => {
                         </div>
                         <div className="mt-2">
                           <input type="text" placeholder="請輸入其他旅遊目的，輸入完按 Enter 新增標籤" className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" onKeyDown={(e) => { if (e.key === 'Enter' && e.target.value.trim() !== '') { e.preventDefault(); const newTag = e.target.value.trim(); let currentTags = formData.tags ? [...formData.tags] : []; if (!currentTags.includes(newTag)) { currentTags.push(newTag); } setFormData({ ...formData, tags: currentTags }); e.target.value = ''; } }} />
-                          <p className="text-[10px] text-slate-400 mt-1">💡 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
+                          <p className="text-[10px] text-slate-400 mt-1"> 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
                           <div className="flex flex-wrap gap-1 mt-2">
                             {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].includes(t)).map(customTag => (
                               <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2.5 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) }); }}>×</button></span>
@@ -590,7 +602,7 @@ export const Dashboard = () => {
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第四步：成員設定</h2>
                       <p className="text-xs text-slate-500 mb-4">請輸入本次旅遊的人數或成員結構（例如：3人、獨旅、5人公司出遊）</p>
-                      <div className="mt-2"><input type="text" placeholder="例如：2-4人、獨旅、家族旅遊10人..." value={formData.group_size || ''} onChange={(e) => setFormData({ ...formData, group_size: e.target.value })} className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" autoFocus /></div>
+                      <div className="mt-2"><input type="text" placeholder="例如：2-4人、獨旅、家族旅遊10人..." value={formData.group_size || ''} onChange={(e) => setFormData({ ...formData, group_size: e.target.value })} className="w-full text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" autoFocus /></div>
                     </div>
                     <div className="flex justify-between mt-6"><button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button><button onClick={handleRecommendSpots} disabled={!formData.group_size || formData.group_size.trim() === ''} className={`px-5 py-2 rounded-lg text-sm font-bold text-white transition-colors ${(!formData.group_size || formData.group_size.trim() === '') ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}>開始海選景點！</button></div>
                   </div>
