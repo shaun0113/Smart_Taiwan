@@ -88,8 +88,50 @@ export const Dashboard = () => {
   const parseSpotsToArray = () => {
     if (!spotsRecommendation) return [];
     
-    const blocks = spotsRecommendation.split(/(?=【[^】]+】|###|\n\d+\.)/);
-    let parsedList = [];
+    const normalizedText = spotsRecommendation.replace(/\r\n/g, '\n');
+    const lines = normalizedText.split('\n');
+    let subSpots = [];
+    let currentSpot = null;
+
+    lines.forEach(line => {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) return;
+
+       const listMatch = trimmedLine.match(/^(\d+[\.、\s]|-)\s*([^:：\n]+)/);
+      
+      if (listMatch) {
+        let cleanTitle = listMatch[2].replace(/[\*#_`\[\]\(\)【】\s📍🐾]/g, '').trim();
+        
+        const noiseWords = ["推薦理由", "景點候選", "清單", "💡", "貼心", "規劃師", "小叮嚀", "提示", "行程", "出發地", "注意"];
+        if (cleanTitle.length >= 2 && cleanTitle.length < 25 && !noiseWords.some(w => cleanTitle.includes(w))) {
+          if (currentSpot) {
+            subSpots.push(currentSpot);
+          }
+          currentSpot = {
+            title: cleanTitle,
+            rawMarkdown: `### ${cleanTitle}\n`
+          };
+          return;
+        }
+      }
+
+     
+      if (currentSpot) {
+        currentSpot.rawMarkdown += trimmedLine + '\n\n';
+      }
+    });
+
+    if (currentSpot) {
+      subSpots.push(currentSpot);
+    }
+
+    
+    if (subSpots.length >= 5) {
+      return subSpots.slice(0, 100);
+    }
+
+    const blocks = normalizedText.split(/(?=【[^】]+】|###|\n\s*\d+[\.、\s])/);
+    let backupList = [];
 
     blocks.forEach(block => {
       const trimmed = block.trim();
@@ -104,23 +146,17 @@ export const Dashboard = () => {
         title = firstLine.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '').trim();
       }
 
-      if (
-        title && 
-        title.length > 1 && 
-        title.length < 25 && 
-        !title.includes("推薦理由") && 
-        !title.includes("景點候選") && 
-        !title.includes("清單") 
-       //!title.includes("💡")
-      ) {
-        parsedList.push({
-          title: title,
-          rawMarkdown: trimmed
-        });
-      }
+      if (!title || title.length < 2 || title.length > 25) return;
+      const noiseWords = ["推薦理由", "景點候選", "清單" , "貼心", "規劃師", "小叮嚀", "提示", "行程", "您好", "哈囉", "建議", "出發地", "注意"];
+      if (noiseWords.some(word => title.includes(word))) return;
+
+      backupList.push({
+        title: title,
+        rawMarkdown: trimmed
+      });
     });
 
-    return parsedList.slice(0, 100);
+    return backupList.slice(0, 100);
   };
 
   const getPagedSpots = () => {
@@ -415,7 +451,7 @@ export const Dashboard = () => {
           <h1 className="text-2xl font-bold text-gray-800" onClick={() => setStep(0)} style={{ cursor: 'pointer' }}>
             智遊台灣 Smart Tour
           </h1>
-          <span className="text-xs text-slate-500 font-medium">資管系畢業專題 – 國內智慧旅遊決策</span>
+          <span className="text-xs text-slate-500 font-medium">資管系畢業專題 – 國內智慧旅遊</span>
         </div>
       </header>
 
@@ -443,7 +479,7 @@ export const Dashboard = () => {
 
             <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col print-area">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
-                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專屬旅遊行程規劃表</h2>
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專屬旅遊行程規劃</h2>
                 <div className="flex gap-2 items-center">
                   <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
                     出發地：{formData.start_location} | {formData.days} 天 {formData.group_size} ({formData.transport})
