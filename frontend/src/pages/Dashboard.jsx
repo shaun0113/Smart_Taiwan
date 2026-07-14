@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 
 const TAIWAN_DISTRICTS = {
   "臺北市": ["中正區", "大同區", "中山區", "松山區", "大安區", "萬華區", "信義區", "士林區", "北投區", "內湖區", "南港區", "文山區"],
-  "新北市": ["板橋區", "三重區", "中和區", "永和區", "新莊區", "新店區", "樹林區", "汐止區", "土城區", "蘆洲區", "五股區", "泰山區", "林口區", "深坑區", "石碇區", "坪林區", "三芝區", "石門區", "八里區", "淡水區", "萬里區", "金山區", "瑞芳區", "雙溪區", "貢寮區", "平溪區", "雙溪區", "烏來區"],
+  "新北市": ["板橋區", "三重區", "中和區", "永和區", "新莊區", "新店區", "樹林區", "汐止區", "土城區", "蘆洲區", "五股區", "泰山區", "林口區", "深坑區", "石碇區", "坪林區", "三芝區", "石門區", "八里區", "淡水區", "萬里區", "金山區", "瑞芳區", "雙溪區", "貢寮區", "平溪區", "烏來區"],
   "桃園市": ["桃園區", "中壢區", "平鎮區", "八德區", "楊梅區", "蘆竹區", "大溪區", "龍潭區", "大園區", "龜山區", "觀音區", "新屋區", "復興區"],
   "臺中市": ["中區", "東區", "南區", "西區", "北區", "北屯區", "西屯區", "南屯區", "太平區", "大里區", "霧峰區", "烏日區", "豐原區", "后里區", "石岡區", "東勢區", "和平區", "新社區", "潭子區", "大雅區", "神岡區", "大肚區", "沙鹿區", "龍井區", "梧棲區", "清水區", "大甲區", "外埔區", "大安區"],
   "臺南市": ["中西區", "東區", "南區", "北區", "安平區", "安南區", "永康區", "歸仁區", "新化區", "左鎮區", "玉井區", "楠西區", "南化區", "仁德區", "關廟區", "龍崎區", "官田區", "麻豆區", "佳里區", "西港區", "七股區", "將軍區", "學甲區", "北門區", "新營區", "後壁區", "白河區", "東山區", "六甲區", "下營區", "柳營區", "鹽水區", "善化區", "大內區", "山上區", "新市區", "安定區"],
@@ -52,6 +52,7 @@ export const Dashboard = () => {
   
   const [copySuccess, setCopySuccess] = useState(false);
 
+  // 地圖即時定位
   const [mapQuery, setMapQuery] = useState('臺北市');
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -70,7 +71,7 @@ export const Dashboard = () => {
   }, [step]);
 
   useEffect(() => {
-    if (!loading && step === 4) {
+    if (!loading && step === 5) { 
       const currentSpots = getPagedSpots();
       if (currentSpots.length > 0 && currentSpots[0].title) {
         setMapQuery(currentSpots[0].title);
@@ -110,7 +111,7 @@ export const Dashboard = () => {
         !title.includes("推薦理由") && 
         !title.includes("景點候選") && 
         !title.includes("清單") 
-        //!title.includes("💡")
+       //!title.includes("💡")
       ) {
         parsedList.push({
           title: title,
@@ -141,7 +142,7 @@ export const Dashboard = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
 
-    if (step === 5 && finalItinerary) {
+    if (step === 6 && finalItinerary) { 
       const lines = finalItinerary.split('\n');
       let firstSpot = null;
 
@@ -181,16 +182,17 @@ export const Dashboard = () => {
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if (e.key === 'Enter') {
-        if (step === 4 || step === 5) return;
+        if (step === 5 || step === 6) return;
         if (step === 0 && formData.is_custom_start) return;
 
-        if (step !== 3 && document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') {
+        if (step !== 4 && document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') {
           return;
         }
         if (step === 0) { e.preventDefault(); setStep(1); } 
         else if (step === 1) { e.preventDefault(); setStep(2); } 
         else if (step === 2) { e.preventDefault(); setStep(3); } 
-        else if (step === 3) { 
+        else if (step === 3) { e.preventDefault(); setStep(4); }
+        else if (step === 4) { 
           e.preventDefault(); 
           if (formData.group_size && formData.group_size.trim() !== '') {
             handleRecommendSpots(); 
@@ -220,7 +222,7 @@ export const Dashboard = () => {
     try {
       setLoading(true);
       setErrorMsg("");
-      setStep(4); 
+      setStep(5); 
       setCurrentPage(1);
       setSelectedSpots([]); 
 
@@ -246,11 +248,11 @@ export const Dashboard = () => {
         setMapQuery(formData.cities[0]);
       } else {
         setErrorMsg(`海選景點失敗：${data.detail || JSON.stringify(data)}`);
-        setStep(3);
+        setStep(4);
       }
     } catch (error) {
       setErrorMsg("景點海選連線失敗，請確認 Render 後端雲端服務是否正常啟動。");
-      setStep(3);
+      setStep(4);
     } finally {
       setLoading(false);
     }
@@ -334,7 +336,7 @@ export const Dashboard = () => {
 
       if (res.ok && data && data.result) {
         setFinalItinerary(data.result);
-        setStep(5); 
+        setStep(6); 
       } else {
         setErrorMsg(`最終行程生成失敗：${data.detail || JSON.stringify(data)}`);
       }
@@ -413,7 +415,7 @@ export const Dashboard = () => {
           <h1 className="text-2xl font-bold text-gray-800" onClick={() => setStep(0)} style={{ cursor: 'pointer' }}>
             智遊台灣 Smart Tour
           </h1>
-          <span className="text-xs text-slate-500 font-medium">資管系畢業專題 – 國內智慧旅遊決策支援系統</span>
+          <span className="text-xs text-slate-500 font-medium">資管系畢業專題 – 國內智慧旅遊決策</span>
         </div>
       </header>
 
@@ -421,19 +423,19 @@ export const Dashboard = () => {
         <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-center mb-2">
             <span className="text-xs font-bold text-emerald-600 tracking-wider">SYSTEM PROGRESS</span>
-            <span className="text-xs font-semibold text-slate-400">目前步驟：{step + 1} / 6</span>
+            <span className="text-xs font-semibold text-slate-400">目前步驟：{step + 1} / 7</span>
           </div>
           <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-emerald-500 transition-all duration-500 ease-out" style={{ width: `${(step + 1) * 16.66}%` }}></div>
+            <div className="h-full bg-emerald-500 transition-all duration-500 ease-out" style={{ width: `${(step + 1) * 14.28}%` }}></div>
           </div>
         </div>
 
         {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg font-semibold text-sm mb-6 shadow-sm">{errorMsg}</div>}
 
-        {step === 5 ? (
+        {step === 6 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="text-base font-bold text-slate-900 mb-2"> 啟程導航（出發地 ➔ 目的地首站）</h2>
+              <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（出發地 ➔ 目的地首站）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Navigation"></iframe>
               </div>
@@ -441,7 +443,7 @@ export const Dashboard = () => {
 
             <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col print-area">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
-                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 旅遊行程規劃表</h2>
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專屬旅遊行程規劃表</h2>
                 <div className="flex gap-2 items-center">
                   <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
                     出發地：{formData.start_location} | {formData.days} 天 {formData.group_size} ({formData.transport})
@@ -465,7 +467,7 @@ export const Dashboard = () => {
                       <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
                       <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce"></div>
                     </div>
-                    <p className="text-xs font-semibold text-emerald-600 mt-5 tracking-wide">正在安排動線中，請稍候...</p>
+                    <p className="text-xs font-semibold text-emerald-600 mt-5 tracking-wide">正在排程動線中，請稍候...</p>
                   </div>
                 ) : (
                   <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-2 prose-headings:mt-3 prose-headings:mb-1 prose-headings:font-bold prose-headings:text-slate-900 prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700 prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1 prose-li:my-0.5">
@@ -486,7 +488,7 @@ export const Dashboard = () => {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             
-            {step === 4 ? (
+            {step === 5 ? (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[620px] lg:col-span-1 animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
@@ -502,11 +504,11 @@ export const Dashboard = () => {
                     {loading ? (
                       <div className="h-full flex flex-col items-center justify-center py-12">
                         <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div></div>
-                        <p className="text-xs font-semibold text-emerald-600 mt-4">正在調度本地數據...</p>
+                        <p className="text-xs font-semibold text-emerald-600 mt-4">正在調度數據...</p>
                       </div>
                     ) : currentPagedSpots.length === 0 ? (
                       <div className="text-center py-12 text-slate-400 text-xs italic">
-                        未偵測到景點結構，正在使用原文本模式渲染...
+                        未偵測到景點...
                         <div className="text-left mt-4 not-italic text-slate-700 whitespace-pre-line">
                           {spotsRecommendation}
                         </div>
@@ -534,7 +536,7 @@ export const Dashboard = () => {
                                   onClick={() => setMapQuery(spot.title)}
                                   className="px-2.5 py-1 text-[11px] font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap"
                                 >
-                                   定位
+                                  定位
                                 </button>
                               </div>
                               <div className="text-xs text-slate-600 leading-snug space-y-0.5 prose prose-sm max-w-none prose-p:my-0.5 prose-p:leading-snug prose-strong:text-slate-800 pl-6">
@@ -571,13 +573,12 @@ export const Dashboard = () => {
                 </div>
 
                 <div className="flex justify-between border-t border-slate-100 pt-4 mt-4">
-                  <button onClick={() => setStep(3)} className="px-5 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-500 hover:bg-slate-50 transition-colors">重新規劃</button>
+                  <button onClick={() => setStep(4)} className="px-5 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-500 hover:bg-slate-50 transition-colors">重新規劃</button>
                   <button onClick={handleConfirmAndGenerateFinal} className="px-6 py-2.5 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm">確定選好了！排定最優路線</button>
                 </div>
               </section>
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
-                {/* 第一步：起點出發地設定 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="space-y-4">
@@ -588,7 +589,7 @@ export const Dashboard = () => {
                           onClick={() => setFormData({ ...formData, is_custom_start: !formData.is_custom_start, start_location: '臺北市' })}
                           className="text-xs font-bold text-emerald-600 hover:text-emerald-700 underline"
                         >
-                          {formData.is_custom_start ? "切換引導式選單" : " 請輸入地址"}
+                          {formData.is_custom_start ? "切換引導選單" : " 直接輸入精確全地址"}
                         </button>
                       </div>
                       
@@ -604,20 +605,19 @@ export const Dashboard = () => {
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
-                                if (formData.start_location.trim()) setStep(1);
+                                if (formData.start_location.trim()) setStep(2);
                               }
                             }}
-                            placeholder="請輸入起點名稱（例如：台北車站、逢甲大學、新竹高鐵站）..."
+                            placeholder="請輸入精確起點名稱（例如：台北車站、逢甲大學、新竹高鐵站）..."
                             className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
                             autoFocus
                           />
                         </div>
                       ) : (
                         <div className="space-y-4 animate-fadeIn">
-                          {/* 1. 選擇縣市 */}
                           <div>
                             <label className="block text-xs font-bold text-slate-500 mb-2">1. 選擇出發縣市</label>
-                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[160px] pr-1">
+                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[320px] pr-1">
                               {Object.keys(TAIWAN_DISTRICTS).map(city => {
                                 const isSelected = selectedCity === city;
                                 return (
@@ -627,7 +627,7 @@ export const Dashboard = () => {
                                       setSelectedCity(city); 
                                       setSelectedDistrict(""); 
                                     }} 
-                                    className={`py-2 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}
+                                    className={`py-3 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}
                                   >
                                     {city}
                                   </div>
@@ -636,46 +636,10 @@ export const Dashboard = () => {
                             </div>
                           </div>
 
-                          {/* 2. 選擇行政區（選擇縣市後動態展開） */}
-                          {selectedCity && TAIWAN_DISTRICTS[selectedCity] && (
-                            <div className="animate-fadeIn">
-                              <label className="block text-xs font-bold text-slate-500 mb-2">2. 選擇行政區</label>
-                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[140px] pr-1">
-                                {TAIWAN_DISTRICTS[selectedCity].map(dist => {
-                                  const isSelected = selectedDistrict === dist;
-                                  return (
-                                    <div 
-                                      key={dist} 
-                                      onClick={() => setSelectedDistrict(dist)} 
-                                      className={`py-1.5 text-center rounded-lg cursor-pointer text-xs font-medium border transition-all select-none ${isSelected ? 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-                                    >
-                                      {dist}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* 3. 手動輸入路段 */}
-                          {selectedCity && (
-                            <div className="animate-fadeIn">
-                              <label className="block text-xs font-bold text-slate-500 mb-1.5">3. 輸入詳細道路/地標（選填）</label>
-                              <input 
-                                type="text"
-                                value={detailRoad}
-                                onChange={(e) => setDetailRoad(e.target.value)}
-                                placeholder="例如：大坪林、中山路二段100號..."
-                                className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
-                              />
-                            </div>
-                          )}
-
-                          {/* 即時組合預覽 */}
                           <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100 text-center">
-                            <span className="text-[11px] text-slate-400 block font-semibold">即時預估出發地：</span>
+                            <span className="text-[11px] text-slate-400 block font-semibold">當前選取縣市：</span>
                             <span className="text-xs font-extrabold text-emerald-700">
-                              {selectedCity}{selectedDistrict}{detailRoad || "(未輸入路段)"}
+                              {selectedCity}
                             </span>
                           </div>
                         </div>
@@ -684,7 +648,7 @@ export const Dashboard = () => {
                     <div className="flex justify-end mt-4">
                       <button 
                         onClick={() => setStep(1)} 
-                        disabled={!formData.start_location.trim()}
+                        disabled={!selectedCity}
                         className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all disabled:bg-slate-300 disabled:cursor-not-allowed"
                       >
                         下一步
@@ -694,6 +658,62 @@ export const Dashboard = () => {
                 )}
 
                 {step === 1 && (
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div className="space-y-4 animate-fadeIn">
+                      <h2 className="text-base font-bold text-slate-900 mb-1">第一步：請選擇詳細行政區與道路</h2>
+                      
+                      {selectedCity && TAIWAN_DISTRICTS[selectedCity] && (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-2">2. 選擇行政區</label>
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[200px] pr-1">
+                            {TAIWAN_DISTRICTS[selectedCity].map(dist => {
+                              const isSelected = selectedDistrict === dist;
+                              return (
+                                <div 
+                                  key={dist} 
+                                  onClick={() => setSelectedDistrict(dist)} 
+                                  className={`py-2 text-center rounded-lg cursor-pointer text-xs font-medium border transition-all select-none ${isSelected ? 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                                >
+                                  {dist}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">3. 輸入詳細道路/地標（選填）</label>
+                        <input 
+                          type="text"
+                          value={detailRoad}
+                          onChange={(e) => setDetailRoad(e.target.value)}
+                          placeholder="例如：大坪林、中山路二段100號..."
+                          className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
+                        />
+                      </div>
+
+                      <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100 text-center">
+                        <span className="text-[11px] text-slate-400 block font-semibold">即時預估出發地：</span>
+                        <span className="text-xs font-extrabold text-emerald-700">
+                          {selectedCity}{selectedDistrict}{detailRoad || "(未輸入路段)"}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between mt-4">
+                      <button onClick={() => setStep(0)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
+                      <button 
+                        onClick={() => setStep(2)} 
+                        className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all"
+                      >
+                        下一步
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {step === 2 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第二步：你想去哪些目的地玩？（可複選）</h2>
@@ -707,13 +727,13 @@ export const Dashboard = () => {
                       </div>
                     </div>
                     <div className="flex justify-between mt-4">
-                      <button onClick={() => setStep(0)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
-                      <button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all">下一步</button>
+                      <button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
+                      <button onClick={() => setStep(3)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all">下一步</button>
                     </div>
                   </div>
                 )}
 
-                {step === 2 && (
+                {step === 3 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第三步：天數與偏好設定</h2>
@@ -755,26 +775,26 @@ export const Dashboard = () => {
                       </div>
                     </div>
                     <div className="flex justify-between mt-6">
-                      <button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
-                      <button onClick={() => setStep(3)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">下一步</button>
+                      <button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
+                      <button onClick={() => setStep(4)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">下一步</button>
                     </div>
                   </div>
                 )}
 
-                {step === 3 && (
+                {step === 4 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第四步：成員設定</h2>
                       <p className="text-xs text-slate-500 mb-4">請輸入本次旅遊的人數或成員結構（例如：3人、獨旅、5人公司出遊）</p>
                       <div className="mt-2"><input type="text" placeholder="例如：2-4人、獨旅、家族旅遊10人..." value={formData.group_size || ''} onChange={(e) => setFormData({ ...formData, group_size: e.target.value })} className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" autoFocus /></div>
                     </div>
-                    <div className="flex justify-between mt-6"><button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button><button onClick={handleRecommendSpots} disabled={!formData.group_size || formData.group_size.trim() === ''} className={`px-5 py-2 rounded-lg text-sm font-bold text-white transition-colors ${(!formData.group_size || formData.group_size.trim() === '') ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}>開始海選景點！</button></div>
+                    <div className="flex justify-between mt-6"><button onClick={() => setStep(3)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button><button onClick={handleRecommendSpots} disabled={!formData.group_size || formData.group_size.trim() === ''} className={`px-5 py-2 rounded-lg text-sm font-bold text-white transition-colors ${(!formData.group_size || formData.group_size.trim() === '') ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}>開始海選景點！</button></div>
                   </div>
                 )}
               </section>
             )}
 
-            {step === 4 ? (
+            {step === 5 ? (
               <section className="flex flex-col gap-6 lg:col-span-1 animate-fadeIn lg:sticky lg:top-6">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                   <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖智慧導航</h2>
@@ -812,16 +832,16 @@ export const Dashboard = () => {
               </section>
             ) : (
               <section className="flex flex-col gap-4">
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5">
-                  <h2 className="text-base font-bold text-slate-900 mb-1">區域地圖智慧導航</h2>
-                  <div className="mt-2 h-52 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5 flex-1 flex flex-col">
+                  <h2 className="text-base font-bold text-slate-900 mb-1">區域地圖智慧導航（動態路線預覽）</h2>
+                  <div className="mt-2 h-[460px] rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                     <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Initial Map Preview"></iframe>
                   </div>
                 </div>
 
-                {step > 0 && (
+                {step > 1 && (
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5 flex-1 flex flex-col animate-fadeIn">
-                    <h2 className="text-base font-bold text-slate-900 mb-2">旅遊決策建議</h2>
+                    <h2 className="text-base font-bold text-slate-900 mb-2">智慧旅遊決策建議</h2>
                     <div className="flex-1 bg-slate-50/70 rounded-xl p-4 border border-slate-100 min-h-[260px] max-h-[360px] overflow-y-auto text-sm text-slate-700 flex items-center justify-center">
                       <p className="text-slate-400 text-xs text-center italic">尚未產生建議，請先在左側面板完成偏好設定。</p>
                     </div>
