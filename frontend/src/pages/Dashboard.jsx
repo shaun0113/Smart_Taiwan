@@ -26,12 +26,10 @@ export const Dashboard = () => {
   
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // 地圖即時定位狀態
   const [mapQuery, setMapQuery] = useState('臺北市');
 
-  // 🚀 分頁與勾選購物車核心狀態
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedSpots, setSelectedSpots] = useState([]); // 儲存使用者勾選的景點名稱陣列
+  const [selectedSpots, setSelectedSpots] = useState([]);
   const spotsPerPage = 10;
 
   const resultEndRef = useRef(null);
@@ -54,7 +52,6 @@ export const Dashboard = () => {
     }
   }, [currentPage, spotsRecommendation]);
 
-  // 將後端海選文字切片為陣列
   const parseSpotsToArray = () => {
     if (!spotsRecommendation) return [];
     
@@ -100,7 +97,6 @@ export const Dashboard = () => {
     return allSpots.slice(indexOfFirstSpot, indexOfLastSpot);
   };
 
-  // 🚀 處理景點勾選反轉
   const handleToggleSpotCheckbox = (spotTitle) => {
     if (selectedSpots.includes(spotTitle)) {
       setSelectedSpots(selectedSpots.filter(t => t !== spotTitle));
@@ -549,7 +545,6 @@ export const Dashboard = () => {
               </section>
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
-                {/* 第一步：起點出發地設定 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
@@ -664,13 +659,16 @@ export const Dashboard = () => {
                           <p className="text-[10px] text-slate-400 mt-1"> 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
                           <div className="flex flex-wrap gap-1 mt-2">
                             {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].includes(t)).map(customTag => (
-                              <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2.5 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) }); }}>×</button></span>
+                              <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2.5 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { let newTags = formData.tags ? [...formData.tags] : []; newTags = newTags.filter(t => t !== customTag); setFormData({ ...formData, tags: newTags }); }}>×</button></span>
                             ))}
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div className="flex justify-between mt-6"><button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button><button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">下一步</button></div>
+                    <div className="flex justify-between mt-6">
+                      <button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
+                      <button onClick={() => setStep(3)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">下一步</button>
+                    </div>
                   </div>
                 )}
 
