@@ -31,7 +31,7 @@ class SmartTourEngine:
         if self.gemini_key:
             self.client = genai.Client(api_key=self.gemini_key)
             #self.model_name = 'gemini-2.5-pro' 付費版
-            self.model_name = 'gemini-2.5-flash' #免費版
+            self.model_name = 'gemini-2.5-flash-lite' #免費版
         else:
             self.client = None
             logger.warning("未偵測到 GEMINI_API_KEY 環境變數，AI 功能將無法運作。")
