@@ -26,7 +26,12 @@ export const Dashboard = () => {
   
   const [copySuccess, setCopySuccess] = useState(false);
 
+  // 地圖即時定位狀態
   const [mapQuery, setMapQuery] = useState('臺北市');
+
+  // 🚀 分頁核心狀態
+  const [currentPage, setCurrentPage] = useState(1);
+  const spotsPerPage = 10;
 
   const resultEndRef = useRef(null);
   const itineraryRef = useRef(null);
@@ -39,11 +44,66 @@ export const Dashboard = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
 
+  // 海選分頁切換時，地圖自動滾動與定位
   useEffect(() => {
-    if (!loading && step === 4) { 
-      scrollToBottom();
+    if (!loading && step === 4) {
+      // 換頁時自動將地圖定位到當前頁面的第一個景點
+      const currentSpots = getPagedSpots();
+      if (currentSpots.length > 0 && currentSpots[0].title) {
+        setMapQuery(currentSpots[0].title);
+      }
     }
-  }, [spotsRecommendation, finalItinerary, loading, apiMsg, step]);
+  }, [currentPage, spotsRecommendation]);
+
+  // 🛠️ 將後端吐回來的長篇文字拆解成獨立的景點物件陣列（最多撈取 100 個）
+  const parseSpotsToArray = () => {
+    if (!spotsRecommendation) return [];
+    
+    // 依據常見的景點標題特徵（例如 【景點名】 或 ### 或 數字開頭）進行切分
+    const blocks = spotsRecommendation.split(/(?=【[^】]+】|###|\n\d+\.)/);
+    let parsedList = [];
+
+    blocks.forEach(block => {
+      const trimmed = block.trim();
+      if (!trimmed) return;
+
+      // 提取標題：優先抓取 【...】 內部的景點名稱
+      let title = "";
+      const bracketMatch = trimmed.match(/【([^】]+)】/);
+      if (bracketMatch) {
+        title = bracketMatch[1].trim();
+      } else {
+        const firstLine = trimmed.split('\n')[0];
+        title = firstLine.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '').trim();
+      }
+
+      // 過濾雜訊，確保抓到的是真實景點名稱
+      if (
+        title && 
+        title.length > 1 && 
+        title.length < 25 && 
+        !title.includes("推薦理由") && 
+        !title.includes("景點候選") && 
+        !title.includes("清單") &&
+        !title.includes("💡")
+      ) {
+        parsedList.push({
+          title: title,
+          rawMarkdown: trimmed
+        });
+      }
+    });
+
+    return parsedList.slice(0, 100); // 鎖定最多 100 個景點
+  };
+
+  // 撈出當前頁面該顯示的 10 個景點
+  const getPagedSpots = () => {
+    const allSpots = parseSpotsToArray();
+    const indexOfLastSpot = currentPage * spotsPerPage;
+    const indexOfFirstSpot = indexOfLastSpot - spotsPerPage;
+    return allSpots.slice(indexOfFirstSpot, indexOfLastSpot);
+  };
 
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
@@ -55,49 +115,14 @@ export const Dashboard = () => {
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        
         if (line.match(/\d{2}:\d{2}/) && (line.includes('-') || line.includes('─') || line.includes('～'))) {
           let cleanName = line.replace(/^\d{2}:\d{2}\s*[-─～]\s*\d{2}:\d{2}/, '').trim();
           cleanName = cleanName.replace(/^(午餐|晚餐|點心|早餐|下午茶|景點|推薦|行程)[:：\s]*/, '').trim();
+          cleanName = cleanName.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '').trim();
 
-          cleanName = cleanName
-            .replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '')
-            .replace(/^(前往|出發前往|到|至|抵達)/, '')
-            .trim();
-
-          if (
-            cleanName.length > 1 && 
-            cleanName.length < 20 && 
-            !cleanName.includes('出發') && 
-            !cleanName.includes('前往') && 
-            !cleanName.includes('車程') && 
-            !cleanName.includes('高鐵') &&
-            !cleanName.includes('飯店') &&
-            !cleanName.includes('入住') &&
-            !cleanName.includes(formData.start_location)
-          ) {
+          if (cleanName.length > 1 && cleanName.length < 20 && !cleanName.includes('出發') && !cleanName.includes('前往') && !cleanName.includes('車程') && !cleanName.includes('飯店') && !cleanName.includes(formData.start_location)) {
             firstSpot = cleanName;
             break; 
-          }
-        }
-      }
-
-      if (!firstSpot) {
-        for (let i = 0; i < lines.length; i++) {
-          const cleanLine = lines[i]
-            .replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '')
-            .replace(/(推薦理由|預計停留|停留|交通|大眾運輸|自駕|時間)[:：].*$/, '')
-            .trim();
-
-          if (
-            cleanLine.length > 1 && 
-            cleanLine.length < 15 && 
-            !cleanLine.includes('行程') && !cleanLine.includes('第') && !cleanLine.includes('天') && 
-            !cleanLine.includes('好的') && !cleanLine.includes('歡迎') && !cleanLine.includes('摘要') &&
-            !cleanLine.includes('約會') && !cleanLine.includes('吃貨') && !cleanLine.includes('打卡')
-          ) {
-            firstSpot = cleanLine;
-            break;
           }
         }
       }
@@ -164,6 +189,7 @@ export const Dashboard = () => {
       setLoading(true);
       setErrorMsg("");
       setStep(4); 
+      setCurrentPage(1); // 重新海選時重設回第一頁
 
       const res = await fetch('https://smart-taiwan.onrender.com/api/v1/recommend-spots', {
         method: 'POST',
@@ -325,6 +351,10 @@ export const Dashboard = () => {
     window.print();
   };
 
+  const allParsedSpots = parseSpotsToArray();
+  const totalPages = Math.ceil(allParsedSpots.length / spotsPerPage);
+  const currentPagedSpots = getPagedSpots();
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
       <style>{`
@@ -362,7 +392,7 @@ export const Dashboard = () => {
         {step === 5 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（出發地 ➔ 目的地首站）</h2>
+              <h2 className="text-base font-bold text-slate-900 mb-2">🗺️ 智慧啟程導航（出發地 ➔ 目的地首站）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Navigation"></iframe>
               </div>
@@ -370,7 +400,7 @@ export const Dashboard = () => {
 
             <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col print-area">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
-                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">意遊台灣 專屬旅遊行程規劃表</h2>
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">意遊台灣 專專屬旅遊行程規劃表</h2>
                 <div className="flex gap-2 items-center">
                   <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
                     出發地：{formData.start_location} | {formData.days} 天 {formData.group_size} ({formData.transport})
@@ -416,54 +446,80 @@ export const Dashboard = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             
             {step === 4 ? (
-              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[580px] lg:col-span-1 animate-fadeIn">
+              // 🚀 左側海選面板：支援每頁 10 個景點的前端硬分頁機制
+              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[620px] lg:col-span-1 animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
-                  <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">💡 智慧旅遊決策建議</h2>
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                    <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">💡 智慧海選推薦名單</h2>
+                    {allParsedSpots.length > 0 && (
+                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md font-semibold">
+                        符合目的地景點共 {allParsedSpots.length} 個
+                      </span>
+                    )}
+                  </div>
                   
-                  <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 whitespace-pre-line tracking-wide">
+                  <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 tracking-wide">
                     {loading ? (
                       <div className="h-full flex flex-col items-center justify-center py-12">
                         <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div></div>
-                        <p className="text-xs font-semibold text-emerald-600 mt-4">正在調度本地大數據與過濾篩選最佳推薦中...</p>
+                        <p className="text-xs font-semibold text-emerald-600 mt-4">正在調度本地數據進行精確分頁排列中...</p>
+                      </div>
+                    ) : currentPagedSpots.length === 0 ? (
+                      <div className="text-center py-12 text-slate-400 text-xs italic">
+                        未偵測到標準景點結構，正在使用原文本模式渲染...
+                        <div className="text-left mt-4 not-italic text-slate-700 whitespace-pre-line">
+                          {spotsRecommendation}
+                        </div>
                       </div>
                     ) : (
-                      <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-2 prose-headings:mt-3 prose-headings:mb-1 prose-headings:font-bold prose-headings:text-slate-900 prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700 prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1 prose-li:my-0.5">
-                        <ReactMarkdown 
-                          components={{
-                            p: ({node, children}) => {
-                              const childrenArray = Array.isArray(children) ? children : [children];
-                              
-                              let textContent = "";
-                              childrenArray.forEach(child => {
-                                if (child?.props?.children) textContent += child.props.children.toString();
-                                else if (typeof child === 'string') textContent += child;
-                              });
-
-                              const cleanSpotName = textContent.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '').trim();
-
-                              if (cleanSpotName.length > 1 && cleanSpotName.length < 20 && !cleanSpotName.includes("推薦理由") && !cleanSpotName.includes("景點候選") && !cleanSpotName.includes("💡") && !cleanSpotName.includes("請檢閱")) {
-                                return (
-                                  <div className="flex items-center justify-between gap-3 my-2 p-2.5 bg-slate-50 border border-slate-100 rounded-xl hover:bg-slate-100 transition-all shadow-2xs">
-                                    <p className="!m-0 text-slate-800 font-bold text-sm">📍 {children}</p>
-                                    <button 
-                                      type="button"
-                                      onClick={() => setMapQuery(cleanSpotName)}
-                                      className="px-3 py-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap"
-                                    >
-                                       查看景點
-                                    </button>
-                                  </div>
-                                );
-                              }
-                              return <p className="text-slate-600 my-1">{children}</p>;
-                            }
-                          }}
-                        >
-                          {spotsRecommendation ? spotsRecommendation.replace(/<br\s*\/?>/gi, '\n') : ''}
-                        </ReactMarkdown>
+                      // 🚀 緊湊版排版樣式優化，字與字行距收緊，解決原本太寬的問題
+                      <div className="space-y-3">
+                        {currentPagedSpots.map((spot, idx) => (
+                          <div key={idx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl hover:bg-slate-100/80 transition-all shadow-xs flex flex-col gap-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <h3 className="text-sm font-extrabold text-slate-900 m-0 flex items-center gap-1.5">
+                                📍 <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-xs">#{((currentPage - 1) * spotsPerPage) + idx + 1}</span> {spot.title}
+                              </h3>
+                              <button 
+                                type="button"
+                                onClick={() => setMapQuery(spot.title)}
+                                className="px-2.5 py-1 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap"
+                              >
+                                🗺️ 定位查看
+                              </button>
+                            </div>
+                            {/* 行距緊湊化渲染 */}
+                            <div className="text-xs text-slate-600 leading-snug space-y-0.5 prose prose-sm max-w-none prose-p:my-0.5 prose-p:leading-snug prose-strong:text-slate-800">
+                              <ReactMarkdown>{spot.rawMarkdown}</ReactMarkdown>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
+
+                  {/* 🚀 分頁控制按鈕列 */}
+                  {!loading && totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-slate-100 no-print">
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="px-2.5 py-1 text-xs font-semibold rounded border border-slate-200 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+                      >
+                        上一頁
+                      </button>
+                      <span className="text-xs font-bold text-slate-500 px-2">
+                        頁次 {currentPage} / {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="px-2.5 py-1 text-xs font-semibold rounded border border-slate-200 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+                      >
+                        下一頁
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-between border-t border-slate-100 pt-4 mt-4">
@@ -473,6 +529,7 @@ export const Dashboard = () => {
               </section>
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
+                {/* 第一步：起點出發地設定 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
@@ -483,7 +540,7 @@ export const Dashboard = () => {
                           onClick={() => setFormData({ ...formData, is_custom_start: !formData.is_custom_start, start_location: '臺北市' })}
                           className="text-xs font-bold text-emerald-600 hover:text-emerald-700 underline"
                         >
-                          {formData.is_custom_start ? "切換縣市選單" : " 輸入精確地址/地標"}
+                          {formData.is_custom_start ? "切換縣市選單" : "⌨️ 輸入精確地址/地標"}
                         </button>
                       </div>
                       <p className="text-xs text-slate-500 mb-4">系統將以此起點精確估算第一天的路徑開車與大眾運輸時間。</p>
@@ -507,7 +564,7 @@ export const Dashboard = () => {
                             className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
                             autoFocus
                           />
-                          <p className="text-[10px] text-slate-400 mt-2"> 精確地址可以包含地標名稱，右側地圖會即時為您測試定位解析線條。</p>
+                          <p className="text-[10px] text-slate-400 mt-2">💡 精確地址可以包含地標名稱，右側地圖會即時為您測試定位解析線條。</p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px] pr-1 animate-fadeIn">
@@ -584,7 +641,7 @@ export const Dashboard = () => {
                         </div>
                         <div className="mt-2">
                           <input type="text" placeholder="請輸入其他旅遊目的，輸入完按 Enter 新增標籤" className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" onKeyDown={(e) => { if (e.key === 'Enter' && e.target.value.trim() !== '') { e.preventDefault(); const newTag = e.target.value.trim(); let currentTags = formData.tags ? [...formData.tags] : []; if (!currentTags.includes(newTag)) { currentTags.push(newTag); } setFormData({ ...formData, tags: currentTags }); e.target.value = ''; } }} />
-                          <p className="text-[10px] text-slate-400 mt-1"> 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
+                          <p className="text-[10px] text-slate-400 mt-1">💡 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
                           <div className="flex flex-wrap gap-1 mt-2">
                             {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].includes(t)).map(customTag => (
                               <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2.5 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { setFormData({ ...formData, tags: formData.tags.filter(t => t !== customTag) }); }}>×</button></span>
