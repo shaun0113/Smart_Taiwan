@@ -1,17 +1,43 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 
+const TAIWAN_DISTRICTS = {
+  "臺北市": ["中正區", "大同區", "中山區", "松山區", "大安區", "萬華區", "信義區", "士林區", "北投區", "內湖區", "南港區", "文山區"],
+  "新北市": ["板橋區", "三重區", "中和區", "永和區", "新莊區", "新店區", "樹林區", "汐止區", "土城區", "蘆洲區", "五股區", "泰山區", "林口區", "深坑區", "石碇區", "坪林區", "三芝區", "石門區", "八里區", "淡水區", "萬里區", "金山區", "瑞芳區", "雙溪區", "貢寮區", "平溪區", "雙溪區", "烏來區"],
+  "桃園市": ["桃園區", "中壢區", "平鎮區", "八德區", "楊梅區", "蘆竹區", "大溪區", "龍潭區", "大園區", "龜山區", "觀音區", "新屋區", "復興區"],
+  "臺中市": ["中區", "東區", "南區", "西區", "北區", "北屯區", "西屯區", "南屯區", "太平區", "大里區", "霧峰區", "烏日區", "豐原區", "后里區", "石岡區", "東勢區", "和平區", "新社區", "潭子區", "大雅區", "神岡區", "大肚區", "沙鹿區", "龍井區", "梧棲區", "清水區", "大甲區", "外埔區", "大安區"],
+  "臺南市": ["中西區", "東區", "南區", "北區", "安平區", "安南區", "永康區", "歸仁區", "新化區", "左鎮區", "玉井區", "楠西區", "南化區", "仁德區", "關廟區", "龍崎區", "官田區", "麻豆區", "佳里區", "西港區", "七股區", "將軍區", "學甲區", "北門區", "新營區", "後壁區", "白河區", "東山區", "六甲區", "下營區", "柳營區", "鹽水區", "善化區", "大內區", "山上區", "新市區", "安定區"],
+  "高雄市": ["新興區", "前金區", "苓雅區", "鹽埕區", "鼓山區", "旗津區", "前鎮區", "三民區", "楠梓區", "小港區", "左營區", "仁武區", "大社區", "岡山區", "路竹區", "阿蓮區", "田寮區", "燕巢區", "橋頭區", "梓官區", "彌陀區", "永安區", "湖內區", "鳳山區", "大寮區", "林園區", "鳥松區", "大樹區", "旗山區", "美濃區", "六龜區", "內門區", "杉林區", "甲仙區", "桃源區", "那瑪夏區", "茂林區", "茄萣區"],
+  "基隆市": ["仁愛區", "信義區", "中正區", "中山區", "安樂區", "暖暖區", "七堵區"],
+  "新竹市": ["東區", "北區", "香山區"],
+  "新竹縣": ["竹北市", "竹東鎮", "新埔鎮", "關西鎮", "湖口鄉", "新豐鄉", "芎林鄉", "橫山鄉", "北埔鄉", "寶山鄉", "峨眉鄉", "尖石鄉", "五峰鄉"],
+  "苗栗縣": ["苗栗市", "頭份市", "竹南鎮", "後龍鎮", "通霄鎮", "苑裡鎮", "頭屋鄉", "公館鄉", "銅鑼鄉", "三義鄉", "西湖鄉", "造橋鄉", "三灣鄉", "南庄鄉", "大湖鄉", "獅潭鄉", "卓蘭鎮", "泰安鄉"],
+  "彰化縣": ["彰化市", "員林市", "鹿港鎮", "和美鎮", "北斗鎮", "溪湖鎮", "田中鎮", "二林鎮", "線西鄉", "伸港鄉", "福興鄉", "秀水鄉", "花壇鄉", "芬園鄉", "大村鄉", "埔鹽鄉", "埔心鄉", "永靖鄉", "社頭鄉", "二水鄉", "田尾鄉", "埤頭鄉", "芳苑鄉", "大城鄉", "竹塘鄉", "溪州鄉"],
+  "南投縣": ["南投市", "埔里鎮", "草屯鎮", "竹山鎮", "集集鎮", "名間鄉", "鹿谷鄉", "中寮鄉", "魚池鄉", "國姓鄉", "水里鄉", "信義鄉", "仁愛鄉"],
+  "雲林縣": ["斗六市", "斗南鎮", "虎尾鎮", "西螺鎮", "土庫鎮", "北港鎮", "古坑鄉", "大埤鄉", "莿桐鄉", "林內鄉", "二崙鄉", "崙背鄉", "麥寮鄉", "東勢鄉", "褒忠鄉", "台西鄉", "元長鄉", "四湖鄉", "口湖鄉", "水林鄉"],
+  "嘉義市": ["東區", "西區"],
+  "嘉義縣": ["太保市", "朴子市", "布袋鎮", "大林鎮", "民雄鄉", "溪口鄉", "新港鄉", "六腳鄉", "東石鄉", "義竹鄉", "鹿草鄉", "水上鄉", "中埔鄉", "竹崎鄉", "梅山鄉", "番路鄉", "大埔鄉", "阿里山鄉"],
+  "屏東縣": ["屏東市", "潮州鎮", "東港鎮", "恆春鎮", "萬丹鄉", "長治鄉", "麟洛鄉", "九如鄉", "里港鄉", "鹽埔鄉", "高樹鄉", "萬巒鄉", "內埔鄉", "竹田鄉", "新埤鄉", "枋寮鄉", "新園鄉", "崁頂鄉", "林邊鄉", "南州鄉", "佳冬鄉", "琉球鄉", "車城鄉", "滿州鄉", "枋山鄉", "三地門鄉", "霧台鄉", "瑪家鄉", "泰武鄉", "來義鄉", "春日鄉", "獅子鄉", "牡丹鄉", "雙流鄉"],
+  "宜蘭縣": ["宜蘭市", "羅東鎮", "蘇澳鎮", "頭城鎮", "礁溪鄉", "壯圍鄉", "員山鄉", "冬山鄉", "五結鄉", "三星鄉", "大同鄉", "南澳鄉"],
+  "花蓮縣": ["花蓮市", "鳳林鎮", "玉里鎮", "新城鄉", "吉安鄉", "壽豐鄉", "光復鄉", "豐濱鄉", "瑞穗鄉", "富里鄉", "秀林鄉", "萬榮鄉", "卓溪鄉"],
+  "臺東縣": ["臺東市", "成功鎮", "關山鎮", "卑南鄉", "大武鄉", "太麻里鄉", "東河鄉", "長濱鄉", "鹿野鄉", "池上鄉", "綠島鄉", "延平鄉", "海端鄉", "達仁鄉", "金峰鄉", "蘭嶼鄉"]
+};
+
 export const Dashboard = () => {
   const [formData, setFormData] = useState({
     start_location: '臺北市',
     is_custom_start: false, 
     cities: ['臺北市'],
     days: 3,
-    group_size: '2-4人',
+    group_size: '2人',
     tags: [],
     transport: '自駕',
     start_time: '08:00'
   });
+
+  const [selectedCity, setSelectedCity] = useState("臺北市"); 
+  const [selectedDistrict, setSelectedDistrict] = useState(""); 
+  const [detailRoad, setDetailRoad] = useState(""); 
 
   const [step, setStep] = useState(0); 
   const [loading, setLoading] = useState(false);
@@ -29,7 +55,7 @@ export const Dashboard = () => {
   const [mapQuery, setMapQuery] = useState('臺北市');
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedSpots, setSelectedSpots] = useState([]);
+  const [selectedSpots, setSelectedSpots] = useState([]); 
   const spotsPerPage = 10;
 
   const resultEndRef = useRef(null);
@@ -51,6 +77,12 @@ export const Dashboard = () => {
       }
     }
   }, [currentPage, spotsRecommendation]);
+
+  useEffect(() => {
+    const combinedAddress = `${selectedCity}${selectedDistrict}${detailRoad}`.trim();
+    setFormData(prev => ({ ...prev, start_location: combinedAddress || selectedCity }));
+    setMapQuery(combinedAddress || selectedCity);
+  }, [selectedCity, selectedDistrict, detailRoad]);
 
   const parseSpotsToArray = () => {
     if (!spotsRecommendation) return [];
@@ -77,8 +109,8 @@ export const Dashboard = () => {
         title.length < 25 && 
         !title.includes("推薦理由") && 
         !title.includes("景點候選") && 
-        !title.includes("清單") &&
-        !title.includes("💡")
+        !title.includes("清單") 
+        //!title.includes("💡")
       ) {
         parsedList.push({
           title: title,
@@ -401,7 +433,7 @@ export const Dashboard = () => {
         {step === 5 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（出發地 ➔ 目的地首站）</h2>
+              <h2 className="text-base font-bold text-slate-900 mb-2"> 啟程導航（出發地 ➔ 目的地首站）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Navigation"></iframe>
               </div>
@@ -409,7 +441,7 @@ export const Dashboard = () => {
 
             <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col print-area">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
-                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">意遊台灣 專屬旅遊行程規劃表</h2>
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 旅遊行程規劃表</h2>
                 <div className="flex gap-2 items-center">
                   <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
                     出發地：{formData.start_location} | {formData.days} 天 {formData.group_size} ({formData.transport})
@@ -433,7 +465,7 @@ export const Dashboard = () => {
                       <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
                       <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce"></div>
                     </div>
-                    <p className="text-xs font-semibold text-emerald-600 mt-5 tracking-wide">正在路徑優化排程動線中，請稍候...</p>
+                    <p className="text-xs font-semibold text-emerald-600 mt-5 tracking-wide">正在安排動線中，請稍候...</p>
                   </div>
                 ) : (
                   <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-2 prose-headings:mt-3 prose-headings:mb-1 prose-headings:font-bold prose-headings:text-slate-900 prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700 prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1 prose-li:my-0.5">
@@ -502,7 +534,7 @@ export const Dashboard = () => {
                                   onClick={() => setMapQuery(spot.title)}
                                   className="px-2.5 py-1 text-[11px] font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap"
                                 >
-                                  🗺️ 定位
+                                   定位
                                 </button>
                               </div>
                               <div className="text-xs text-slate-600 leading-snug space-y-0.5 prose prose-sm max-w-none prose-p:my-0.5 prose-p:leading-snug prose-strong:text-slate-800 pl-6">
@@ -545,9 +577,10 @@ export const Dashboard = () => {
               </section>
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
+                {/* 第一步：起點出發地設定 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
-                    <div>
+                    <div className="space-y-4">
                       <div className="flex justify-between items-center mb-1">
                         <h2 className="text-base font-bold text-slate-900">第一步：你的出發地在哪裡？</h2>
                         <button 
@@ -555,10 +588,9 @@ export const Dashboard = () => {
                           onClick={() => setFormData({ ...formData, is_custom_start: !formData.is_custom_start, start_location: '臺北市' })}
                           className="text-xs font-bold text-emerald-600 hover:text-emerald-700 underline"
                         >
-                          {formData.is_custom_start ? "切換縣市選單" : "⌨️ 輸入精確地址/地標"}
+                          {formData.is_custom_start ? "切換引導式選單" : " 請輸入地址"}
                         </button>
                       </div>
-                      <p className="text-xs text-slate-500 mb-4">系統將以此起點精確估算第一天的路徑開車與大眾運輸時間。</p>
                       
                       {formData.is_custom_start ? (
                         <div className="mt-2 animate-fadeIn">
@@ -575,20 +607,77 @@ export const Dashboard = () => {
                                 if (formData.start_location.trim()) setStep(1);
                               }
                             }}
-                            placeholder="請輸入精確起點名稱（例如：台北車站、逢甲大學、新竹高鐵站）..."
+                            placeholder="請輸入起點名稱（例如：台北車站、逢甲大學、新竹高鐵站）..."
                             className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
                             autoFocus
                           />
-                          <p className="text-[10px] text-slate-400 mt-2"> 精確地址可以包含地標名稱，右側地圖會即時為您測試定位解析線條。</p>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px] pr-1 animate-fadeIn">
-                          {["基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣"].map(city => {
-                            const isSelected = formData.start_location === city;
-                            return (
-                              <div key={city} onClick={() => { setFormData({ ...formData, start_location: city }); setMapQuery(city); }} className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}>{city}</div>
-                            );
-                          })}
+                        <div className="space-y-4 animate-fadeIn">
+                          {/* 1. 選擇縣市 */}
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-2">1. 選擇出發縣市</label>
+                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[160px] pr-1">
+                              {Object.keys(TAIWAN_DISTRICTS).map(city => {
+                                const isSelected = selectedCity === city;
+                                return (
+                                  <div 
+                                    key={city} 
+                                    onClick={() => { 
+                                      setSelectedCity(city); 
+                                      setSelectedDistrict(""); 
+                                    }} 
+                                    className={`py-2 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}
+                                  >
+                                    {city}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* 2. 選擇行政區（選擇縣市後動態展開） */}
+                          {selectedCity && TAIWAN_DISTRICTS[selectedCity] && (
+                            <div className="animate-fadeIn">
+                              <label className="block text-xs font-bold text-slate-500 mb-2">2. 選擇行政區</label>
+                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[140px] pr-1">
+                                {TAIWAN_DISTRICTS[selectedCity].map(dist => {
+                                  const isSelected = selectedDistrict === dist;
+                                  return (
+                                    <div 
+                                      key={dist} 
+                                      onClick={() => setSelectedDistrict(dist)} 
+                                      className={`py-1.5 text-center rounded-lg cursor-pointer text-xs font-medium border transition-all select-none ${isSelected ? 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                                    >
+                                      {dist}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 3. 手動輸入路段 */}
+                          {selectedCity && (
+                            <div className="animate-fadeIn">
+                              <label className="block text-xs font-bold text-slate-500 mb-1.5">3. 輸入詳細道路/地標（選填）</label>
+                              <input 
+                                type="text"
+                                value={detailRoad}
+                                onChange={(e) => setDetailRoad(e.target.value)}
+                                placeholder="例如：大坪林、中山路二段100號..."
+                                className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
+                              />
+                            </div>
+                          )}
+
+                          {/* 即時組合預覽 */}
+                          <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100 text-center">
+                            <span className="text-[11px] text-slate-400 block font-semibold">即時預估出發地：</span>
+                            <span className="text-xs font-extrabold text-emerald-700">
+                              {selectedCity}{selectedDistrict}{detailRoad || "(未輸入路段)"}
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -688,7 +777,7 @@ export const Dashboard = () => {
             {step === 4 ? (
               <section className="flex flex-col gap-6 lg:col-span-1 animate-fadeIn lg:sticky lg:top-6">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                  <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖智慧導航（即時連動）</h2>
+                  <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖智慧導航</h2>
                   <div className="h-[240px] rounded-xl overflow-hidden border border-slate-100">
                     <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Live Map Preview"></iframe>
                   </div>
@@ -696,7 +785,7 @@ export const Dashboard = () => {
 
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col gap-4">
                   <div>
-                    <h2 className="text-base font-bold text-slate-900 mb-1">偏好意見調整控制台</h2>
+                    <h2 className="text-base font-bold text-slate-900 mb-1">偏好意見調整</h2>
                     <p className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100/70">{apiMsg || "請檢閱左側 AI 智慧決策建議名單。"}</p>
                   </div>
 
@@ -724,18 +813,20 @@ export const Dashboard = () => {
             ) : (
               <section className="flex flex-col gap-4">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5">
-                  <h2 className="text-base font-bold text-slate-900 mb-1">區域地圖智慧導航（動態路線預覽）</h2>
+                  <h2 className="text-base font-bold text-slate-900 mb-1">區域地圖智慧導航</h2>
                   <div className="mt-2 h-52 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                     <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Initial Map Preview"></iframe>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5 flex-1 flex flex-col">
-                  <h2 className="text-base font-bold text-slate-900 mb-2">智慧旅遊決策建議</h2>
-                  <div className="flex-1 bg-slate-50/70 rounded-xl p-4 border border-slate-100 min-h-[260px] max-h-[360px] overflow-y-auto text-sm text-slate-700 flex items-center justify-center">
-                    <p className="text-slate-400 text-xs text-center italic">尚未產生建議，請先在左側面板完成偏好設定。</p>
+                {step > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5 flex-1 flex flex-col animate-fadeIn">
+                    <h2 className="text-base font-bold text-slate-900 mb-2">旅遊決策建議</h2>
+                    <div className="flex-1 bg-slate-50/70 rounded-xl p-4 border border-slate-100 min-h-[260px] max-h-[360px] overflow-y-auto text-sm text-slate-700 flex items-center justify-center">
+                      <p className="text-slate-400 text-xs text-center italic">尚未產生建議，請先在左側面板完成偏好設定。</p>
+                    </div>
                   </div>
-                </div>
+                )}
               </section>
             )}
 
