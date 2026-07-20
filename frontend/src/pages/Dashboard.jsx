@@ -52,7 +52,6 @@ export const Dashboard = () => {
   
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // 地圖即時定位
   const [mapQuery, setMapQuery] = useState('臺北市');
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -85,7 +84,6 @@ export const Dashboard = () => {
     setMapQuery(combinedAddress || selectedCity);
   }, [selectedCity, selectedDistrict, detailRoad]);
 
-  // 🚀 終極反推解析器：利用「推薦理由」的上一行特徵，百分之百精確切分景點
   const parseSpotsToArray = () => {
     if (!spotsRecommendation) return [];
     
@@ -95,43 +93,37 @@ export const Dashboard = () => {
     let subSpots = [];
     let tempLines = [];
 
-    // 1. 先把所有有內容的行清洗乾淨存成陣列
     lines.forEach(line => {
       const trimmed = line.trim();
       if (trimmed) tempLines.push(trimmed);
     });
 
-    // 2. 掃描陣列，利用「推薦理由」反推景點
     for (let i = 0; i < tempLines.length; i++) {
       const currentLine = tempLines[i];
       
-      // 發現關鍵字：代表它的上一行（i - 1）必定是景點名稱！
-      if ((currentLine.includes("推薦理由") || currentLine.includes("浪漫推薦理由")) && i > 0) {
+      if (currentLine.includes("推薦理由") && i > 0) {
         let potentialTitle = tempLines[i - 1];
         
-        // 清理掉標題前可能包含的數字、符號、### 或 1. 2.
-        let cleanTitle = potentialTitle.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '').trim();
+        let cleanTitle = potentialTitle.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:]/g, '').trim();
         
-        // 排除大區域的大標題雜訊與規劃師說明
-        if (
-          cleanTitle && 
-          cleanTitle.length >= 2 && 
-          cleanTitle.length < 25 && 
-          !cleanTitle.includes("都會藝文") && 
-          !cleanTitle.includes("海線浪漫") && 
-          !cleanTitle.includes("山線秘境") &&
-          !cleanTitle.includes("規劃師") &&
-          !cleanTitle.includes("推薦景點")
-        ) {
-          // 收集這個景點的 Markdown 內容（標題 + 推薦理由描述）
+        const blackListWords = [
+          "都會藝文", "濱海極致", "山線秘境", "規劃師", "指南", 
+          "小筆記", "約會清單", "漫步區", "浪漫區", "秘境區", 
+          "行程", "小叮嚀", "提示", "注意事項", "出發地", "台南情侶約會"
+        ];
+        
+        const isNoise = blackListWords.some(word => cleanTitle.includes(word)) || 
+                        /^Day\s*\d+/i.test(cleanTitle) || 
+                        cleanTitle === "" || 
+                        cleanTitle === "--";
+
+        if (!isNoise) {
           let rawMarkdown = `### ${cleanTitle}\n${currentLine}\n\n`;
           
-          // 如果下一行不是別的景點，把後續的敘述（例如地址、營業時間等）也一起打包進來
           if (i + 1 < tempLines.length && !tempLines[i + 1].includes("推薦理由") && tempLines[i + 1].length > 2) {
             rawMarkdown += tempLines[i + 1];
           }
 
-          // 檢查是否重複加入
           if (!subSpots.some(s => s.title === cleanTitle)) {
             subSpots.push({
               title: cleanTitle,
@@ -142,12 +134,10 @@ export const Dashboard = () => {
       }
     }
 
-    // 3. 如果上面成功碎裂出獨立景點，直接回傳
     if (subSpots.length >= 3) {
       return subSpots.slice(0, 100);
     }
 
-    // 4. 備用方案（防禦性切片）
     const blocks = normalizedText.split(/(?=【[^】]+】|###|\n\s*\d+[\.、\s])/);
     let backupList = [];
     blocks.forEach(block => {
