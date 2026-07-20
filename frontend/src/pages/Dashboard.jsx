@@ -52,6 +52,7 @@ export const Dashboard = () => {
   
   const [copySuccess, setCopySuccess] = useState(false);
 
+  // 地圖即時定位
   const [mapQuery, setMapQuery] = useState('臺北市');
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -84,71 +85,51 @@ export const Dashboard = () => {
     setMapQuery(combinedAddress || selectedCity);
   }, [selectedCity, selectedDistrict, detailRoad]);
 
+  // 🚀 結構化管線解析器：只解析後端吐出的 1| 合法景點列，完美消除頭尾、大標題廢話！
   const parseSpotsToArray = () => {
     if (!spotsRecommendation) return [];
     
     const normalizedText = spotsRecommendation.replace(/\r\n/g, '\n');
     const lines = normalizedText.split('\n');
-    
     let subSpots = [];
-    let tempLines = [];
 
     lines.forEach(line => {
-      const trimmed = line.trim();
-      if (trimmed) tempLines.push(trimmed);
-    });
+      const trimmedLine = line.trim();
+      if (!trimmedLine) return;
 
-    for (let i = 0; i < tempLines.length; i++) {
-      const currentLine = tempLines[i];
+      // 使用我們與後端約定好的 "|" 符號切開整行
+      const parts = trimmedLine.split('|');
       
-      if (currentLine.includes("推薦理由") && i > 0) {
-        let potentialTitle = tempLines[i - 1];
-        
-        let cleanTitle = potentialTitle.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:]/g, '').trim();
-        
-        const blackListWords = [
-          "都會藝文", "濱海極致", "山線秘境", "規劃師", "指南", 
-          "小筆記", "約會清單", "漫步區", "浪漫區", "秘境區", 
-          "行程", "小叮嚀", "提示", "注意事項", "出發地", "台南情侶約會"
-        ];
-        
-        const isNoise = blackListWords.some(word => cleanTitle.includes(word)) || 
-                        /^Day\s*\d+/i.test(cleanTitle) || 
-                        cleanTitle === "" || 
-                        cleanTitle === "--";
+      // 🌟 精確比對：開頭必須是 1（代表合法景點），且切分後的欄位數正確
+      if (parts[0] === '1' && parts.length >= 4) {
+        const cleanTitle = parts[1].trim();
+        const mapLocation = parts[2].trim();
+        const description = parts[3].trim();
 
-        if (!isNoise) {
-          let rawMarkdown = `### ${cleanTitle}\n${currentLine}\n\n`;
-          
-          if (i + 1 < tempLines.length && !tempLines[i + 1].includes("推薦理由") && tempLines[i + 1].length > 2) {
-            rawMarkdown += tempLines[i + 1];
-          }
-
-          if (!subSpots.some(s => s.title === cleanTitle)) {
-            subSpots.push({
-              title: cleanTitle,
-              rawMarkdown: rawMarkdown
-            });
-          }
+        if (cleanTitle && cleanTitle !== '--') {
+          subSpots.push({
+            title: cleanTitle,
+            rawMarkdown: `📍 **地圖定位**：${mapLocation}\n\n💡 **推薦理由**：${description}`
+          });
         }
       }
-    }
+      // 💡 備註：如果是 parts[0] === '2' 的前言或系統提示，前端直接過濾不顯示，完美！
+    });
 
-    if (subSpots.length >= 3) {
+    // 備用防禦性方案（萬一後端極度抽風未用 | 分割，走反推保底）
+    if (subSpots.length >= 2) {
       return subSpots.slice(0, 100);
     }
 
-    const blocks = normalizedText.split(/(?=【[^】]+】|###|\n\s*\d+[\.、\s])/);
     let backupList = [];
-    blocks.forEach(block => {
-      const trimmed = block.trim();
-      if (!trimmed) return;
-      let title = trimmed.split('\n')[0].replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '').trim();
-      if (title && title.length >= 2 && title.length < 25 && !title.includes("規劃師")) {
-        backupList.push({ title: title, rawMarkdown: block });
+    lines.forEach((l, idx) => {
+      if ((l.includes("推薦理由") || l.includes("浪漫推薦")) && idx > 0) {
+        let t = lines[idx - 1].replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:]/g, '').trim();
+        if (t && t.length >= 2 && t.length < 25 && !t.includes("規劃") && !t.includes("區") && !t.includes("指南")) {
+          backupList.push({ title: t, rawMarkdown: l });
+        }
       }
     });
-
     return backupList.slice(0, 100);
   };
 
@@ -532,7 +513,7 @@ export const Dashboard = () => {
                   <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 tracking-wide">
                     {loading ? (
                       <div className="h-full flex flex-col items-center justify-center py-12">
-                        <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div></div>
+                        <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]/]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div></div>
                         <p className="text-xs font-semibold text-emerald-600 mt-4">正在調度數據...</p>
                       </div>
                     ) : currentPagedSpots.length === 0 ? (
