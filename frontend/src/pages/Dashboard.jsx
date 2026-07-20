@@ -85,75 +85,78 @@ export const Dashboard = () => {
     setMapQuery(combinedAddress || selectedCity);
   }, [selectedCity, selectedDistrict, detailRoad]);
 
+  // 🚀 終極反推解析器：利用「推薦理由」的上一行特徵，百分之百精確切分景點
   const parseSpotsToArray = () => {
     if (!spotsRecommendation) return [];
     
     const normalizedText = spotsRecommendation.replace(/\r\n/g, '\n');
     const lines = normalizedText.split('\n');
+    
     let subSpots = [];
-    let currentSpot = null;
+    let tempLines = [];
 
+    // 1. 先把所有有內容的行清洗乾淨存成陣列
     lines.forEach(line => {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) return;
-
-       const listMatch = trimmedLine.match(/^(\d+[\.、\s]|-)\s*([^:：\n]+)/);
-      
-      if (listMatch) {
-        let cleanTitle = listMatch[2].replace(/[\*#_`\[\]\(\)【】\s📍🐾]/g, '').trim();
-        
-        const noiseWords = ["推薦理由", "景點候選", "清單", "💡", "貼心", "規劃師", "小叮嚀", "提示", "行程", "出發地", "注意"];
-        if (cleanTitle.length >= 2 && cleanTitle.length < 25 && !noiseWords.some(w => cleanTitle.includes(w))) {
-          if (currentSpot) {
-            subSpots.push(currentSpot);
-          }
-          currentSpot = {
-            title: cleanTitle,
-            rawMarkdown: `### ${cleanTitle}\n`
-          };
-          return;
-        }
-      }
-
-     
-      if (currentSpot) {
-        currentSpot.rawMarkdown += trimmedLine + '\n\n';
-      }
+      const trimmed = line.trim();
+      if (trimmed) tempLines.push(trimmed);
     });
 
-    if (currentSpot) {
-      subSpots.push(currentSpot);
+    // 2. 掃描陣列，利用「推薦理由」反推景點
+    for (let i = 0; i < tempLines.length; i++) {
+      const currentLine = tempLines[i];
+      
+      // 發現關鍵字：代表它的上一行（i - 1）必定是景點名稱！
+      if ((currentLine.includes("推薦理由") || currentLine.includes("浪漫推薦理由")) && i > 0) {
+        let potentialTitle = tempLines[i - 1];
+        
+        // 清理掉標題前可能包含的數字、符號、### 或 1. 2.
+        let cleanTitle = potentialTitle.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '').trim();
+        
+        // 排除大區域的大標題雜訊與規劃師說明
+        if (
+          cleanTitle && 
+          cleanTitle.length >= 2 && 
+          cleanTitle.length < 25 && 
+          !cleanTitle.includes("都會藝文") && 
+          !cleanTitle.includes("海線浪漫") && 
+          !cleanTitle.includes("山線秘境") &&
+          !cleanTitle.includes("規劃師") &&
+          !cleanTitle.includes("推薦景點")
+        ) {
+          // 收集這個景點的 Markdown 內容（標題 + 推薦理由描述）
+          let rawMarkdown = `### ${cleanTitle}\n${currentLine}\n\n`;
+          
+          // 如果下一行不是別的景點，把後續的敘述（例如地址、營業時間等）也一起打包進來
+          if (i + 1 < tempLines.length && !tempLines[i + 1].includes("推薦理由") && tempLines[i + 1].length > 2) {
+            rawMarkdown += tempLines[i + 1];
+          }
+
+          // 檢查是否重複加入
+          if (!subSpots.some(s => s.title === cleanTitle)) {
+            subSpots.push({
+              title: cleanTitle,
+              rawMarkdown: rawMarkdown
+            });
+          }
+        }
+      }
     }
 
-    
-    if (subSpots.length >= 5) {
+    // 3. 如果上面成功碎裂出獨立景點，直接回傳
+    if (subSpots.length >= 3) {
       return subSpots.slice(0, 100);
     }
 
+    // 4. 備用方案（防禦性切片）
     const blocks = normalizedText.split(/(?=【[^】]+】|###|\n\s*\d+[\.、\s])/);
     let backupList = [];
-
     blocks.forEach(block => {
       const trimmed = block.trim();
       if (!trimmed) return;
-
-      let title = "";
-      const bracketMatch = trimmed.match(/【([^】]+)】/);
-      if (bracketMatch) {
-        title = bracketMatch[1].trim();
-      } else {
-        const firstLine = trimmed.split('\n')[0];
-        title = firstLine.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '').trim();
+      let title = trimmed.split('\n')[0].replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '').trim();
+      if (title && title.length >= 2 && title.length < 25 && !title.includes("規劃師")) {
+        backupList.push({ title: title, rawMarkdown: block });
       }
-
-      if (!title || title.length < 2 || title.length > 25) return;
-      const noiseWords = ["推薦理由", "景點候選", "清單" , "貼心", "規劃師", "小叮嚀", "提示", "行程", "您好", "哈囉", "建議", "出發地", "注意"];
-      if (noiseWords.some(word => title.includes(word))) return;
-
-      backupList.push({
-        title: title,
-        rawMarkdown: trimmed
-      });
     });
 
     return backupList.slice(0, 100);
@@ -334,6 +337,20 @@ export const Dashboard = () => {
     }
   };
 
+  const handleCopyToClipboard = () => {
+    if (!finalItinerary) return;
+    navigator.clipboard.writeText(finalItinerary)
+      .then(() => {
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000); 
+      })
+      .catch((err) => console.error('無法複製行程: ', err));
+  };
+
+  const handlePrintPDF = () => {
+    window.print();
+  };
+
   const handleConfirmAndGenerateFinal = async () => {
     let finalSpotsPayload = accumulatedSpots;
     if (selectedSpots.length > 0) {
@@ -416,20 +433,6 @@ export const Dashboard = () => {
     }
   };
 
-  const handleCopyToClipboard = () => {
-    if (!finalItinerary) return;
-    navigator.clipboard.writeText(finalItinerary)
-      .then(() => {
-        setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 2000); 
-      })
-      .catch((err) => console.error('無法複製行程: ', err));
-  };
-
-  const handlePrintPDF = () => {
-    window.print();
-  };
-
   const allParsedSpots = parseSpotsToArray();
   const totalPages = Math.ceil(allParsedSpots.length / spotsPerPage);
   const currentPagedSpots = getPagedSpots();
@@ -451,7 +454,7 @@ export const Dashboard = () => {
           <h1 className="text-2xl font-bold text-gray-800" onClick={() => setStep(0)} style={{ cursor: 'pointer' }}>
             智遊台灣 Smart Tour
           </h1>
-          <span className="text-xs text-slate-500 font-medium">資管系畢業專題 – 國內智慧旅遊</span>
+          <span className="text-xs text-slate-500 font-medium">資管系畢業專題 – 國內智慧旅遊決策</span>
         </div>
       </header>
 
@@ -479,7 +482,7 @@ export const Dashboard = () => {
 
             <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col print-area">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
-                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專屬旅遊行程規劃</h2>
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專屬旅遊行程規劃表</h2>
                 <div className="flex gap-2 items-center">
                   <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
                     出發地：{formData.start_location} | {formData.days} 天 {formData.group_size} ({formData.transport})
