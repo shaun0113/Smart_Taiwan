@@ -152,12 +152,10 @@ export const Dashboard = () => {
     }
   };
 
-  // 🚀 地圖來源邏輯修正：非 Step 6 時只顯示地點位置搜尋，不出現導航路線
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
 
-    // 只有在產出最終行程（Step 6）時才啟動起點到第一站的導航路線
     if (step === 6 && finalItinerary) { 
       const lines = finalItinerary.split('\n');
       let firstSpot = null;
@@ -171,16 +169,11 @@ export const Dashboard = () => {
 
         if (inDetailSection) {
           if (line.match(/\d{2}:\d{2}/)) {
-            let potentialName = line.replace(/^\d{2}:\d{2}\s*[-─～]\s*\d{2}:\d{2}/, '').trim();
-            potentialName = potentialName.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:]/g, '').trim();
+            let potentialName = line.replace(/^\d{2}:\d{2}\s*[-─～~]\s*\d{2}:\d{2}/, '').trim();
+            
+            potentialName = potentialName.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:~\|]/g, '').trim();
 
-            if (!potentialName || potentialName.length <= 1) {
-              if (i + 1 < lines.length) {
-                potentialName = lines[i + 1].replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:]/g, '').trim();
-              }
-            }
-
-            const noiseWords = ['出發', '前往', '車程', '交通', '飯店', '民宿', '抵達', '台北', '臺北', '出發地', '集合'];
+            const noiseWords = ['出發', '前往', '車程', '交通', '飯店', '民宿', '抵達', '台北', '臺北', '出發地', '集合', '啟程', '跨縣市', '自駕'];
             const isNoise = noiseWords.some(w => potentialName.includes(w));
 
             if (potentialName && potentialName.length >= 2 && potentialName.length < 25 && !isNoise) {
@@ -202,7 +195,6 @@ export const Dashboard = () => {
       }
     }
 
-    // Step 0 ~ Step 5：只顯示使用者當前輸入的完整地址/地點（純定位，無導航藍線）
     const locationToDisplay = mapQuery || formData.start_location || targetCity;
     const cleanQuery = locationToDisplay.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
     return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || locationToDisplay)}&z=15&output=embed`;
