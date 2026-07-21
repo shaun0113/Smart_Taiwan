@@ -85,52 +85,62 @@ export const Dashboard = () => {
     setMapQuery(combinedAddress || selectedCity);
   }, [selectedCity, selectedDistrict, detailRoad]);
 
-  // 🚀 結構化管線解析器：只解析後端吐出的 1| 合法景點列，完美消除頭尾、大標題廢話！
+  // 🚀 高相容彈性解析器：兼顧 1| Pipe 格式與傳統條列，確保景點豐富不被誤刪
   const parseSpotsToArray = () => {
     if (!spotsRecommendation) return [];
     
     const normalizedText = spotsRecommendation.replace(/\r\n/g, '\n');
     const lines = normalizedText.split('\n');
-    let subSpots = [];
+    let parsedSpots = [];
 
+    // 策略 A：嘗試解析 1| 結構化 Pipe 格式
     lines.forEach(line => {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) return;
-
-      // 使用我們與後端約定好的 "|" 符號切開整行
-      const parts = trimmedLine.split('|');
-      
-      // 🌟 精確比對：開頭必須是 1（代表合法景點），且切分後的欄位數正確
-      if (parts[0] === '1' && parts.length >= 4) {
-        const cleanTitle = parts[1].trim();
-        const mapLocation = parts[2].trim();
-        const description = parts[3].trim();
-
-        if (cleanTitle && cleanTitle !== '--') {
-          subSpots.push({
-            title: cleanTitle,
-            rawMarkdown: `📍 **地圖定位**：${mapLocation}\n\n💡 **推薦理由**：${description}`
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      const parts = trimmed.split('|');
+      if (parts[0] === '1' && parts.length >= 3) {
+        const title = parts[1].trim().replace(/[\*#_`📍🐾]/g, '');
+        const location = parts.length >= 4 ? parts[2].trim() : title;
+        const desc = parts.length >= 4 ? parts[3].trim() : parts[2].trim();
+        
+        if (title && title.length >= 2 && title.length < 30) {
+          parsedSpots.push({
+            title: title,
+            rawMarkdown: `📍 **地點**：${location}\n\n💡 ${desc}`
           });
         }
       }
-      // 💡 備註：如果是 parts[0] === '2' 的前言或系統提示，前端直接過濾不顯示，完美！
     });
 
-    // 備用防禦性方案（萬一後端極度抽風未用 | 分割，走反推保底）
-    if (subSpots.length >= 2) {
-      return subSpots.slice(0, 100);
-    }
+    if (parsedSpots.length >= 3) return parsedSpots.slice(0, 100);
 
-    let backupList = [];
-    lines.forEach((l, idx) => {
-      if ((l.includes("推薦理由") || l.includes("浪漫推薦")) && idx > 0) {
-        let t = lines[idx - 1].replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:]/g, '').trim();
-        if (t && t.length >= 2 && t.length < 25 && !t.includes("規劃") && !t.includes("區") && !t.includes("指南")) {
-          backupList.push({ title: t, rawMarkdown: l });
+    // 策略 B：若未抓到 Pipe 格式，自動拆解標準條列（如 1. 奇美博物館 或 📍 奇美博物館）
+    let tempTitle = "";
+    let tempDesc = "";
+
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      const match = trimmed.match(/^(\d+[\.、\s]|📍|🔸|-|\*)\s*(.+)/) || trimmed.match(/【([^】]+)】/);
+      const isNoise = ["推薦理由", "景點", "清單", "規劃師", "指南", "小叮嚀", "注意事項", "Day", "區域"].some(w => trimmed.includes(w) && trimmed.length > 20);
+
+      if (match && !isNoise) {
+        if (tempTitle) {
+          parsedSpots.push({ title: tempTitle, rawMarkdown: tempDesc || tempTitle });
         }
+        tempTitle = (match[2] || match[1]).replace(/[\*#_`\[\]\(\)【】\s📍🐾：:]/g, '').trim();
+        tempDesc = "";
+      } else if (tempTitle) {
+        tempDesc += trimmed + "\n";
       }
     });
-    return backupList.slice(0, 100);
+
+    if (tempTitle) {
+      parsedSpots.push({ title: tempTitle, rawMarkdown: tempDesc || tempTitle });
+    }
+
+    return parsedSpots.filter(s => s.title && s.title.length >= 2 && s.title.length < 30).slice(0, 100);
   };
 
   const getPagedSpots = () => {
@@ -528,7 +538,14 @@ export const Dashboard = () => {
                         {currentPagedSpots.map((spot, idx) => {
                           const isChecked = selectedSpots.includes(spot.title);
                           return (
-                            <div key={idx} className={`p-3 border rounded-xl transition-all shadow-xs flex flex-col gap-2 ${isChecked ? 'bg-emerald-50/40 border-emerald-300' : 'bg-slate-50 border-slate-100 hover:bg-slate-100/80'}`}>
+                            <div 
+                              key={idx} 
+                              className={`p-3.5 rounded-xl transition-all shadow-none flex flex-col gap-2 ${
+                                isChecked 
+                                  ? 'bg-emerald-50 border border-emerald-50' 
+                                  : 'bg-slate-100/70 border border-slate-100 hover:bg-slate-200/50'
+                              }`}
+                            >
                               <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-2.5">
                                   <input 
