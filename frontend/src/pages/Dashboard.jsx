@@ -93,7 +93,7 @@ export const Dashboard = () => {
     const lines = normalizedText.split('\n');
     let parsedSpots = [];
 
-    // 策略 A：嘗試解析 1| 結構化 Pipe 格式[cite: 4]
+    // 策略 A：解析 1| 結構化 Pipe 格式[cite: 4]
     lines.forEach(line => {
       const trimmed = line.trim();
       if (!trimmed) return;
@@ -114,7 +114,7 @@ export const Dashboard = () => {
 
     if (parsedSpots.length >= 3) return parsedSpots.slice(0, 100);
 
-    // 策略 B：若未抓到 Pipe 格式，自動拆解標準條列[cite: 4]
+    // 策略 B：拆解標準條列格式[cite: 4]
     let tempTitle = "";
     let tempDesc = "";
 
@@ -158,6 +158,7 @@ export const Dashboard = () => {
     }
   };
 
+  // 🚀 導航邏輯：跳過總覽文字，精準抓取 Day 1 第一站真實景點
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
@@ -165,19 +166,41 @@ export const Dashboard = () => {
     if (step === 6 && finalItinerary) { 
       const lines = finalItinerary.split('\n');
       let firstSpot = null;
+      let inDetailSection = false;
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        if (line.match(/\d{2}:\d{2}/) && (line.includes('-') || line.includes('─') || line.includes('～'))) {
-          let cleanName = line.replace(/^\d{2}:\d{2}\s*[-─～]\s*\d{2}:\d{2}/, '').trim();
-          cleanName = cleanName.replace(/^(午餐|晚餐|點心|早餐|下午茶|景點|推薦|行程)[:：\s]*/, '').trim();
-          cleanName = cleanName.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '').trim();
+        
+        // 1. 跳過最上方的【行程概要總覽】
+        if (line.includes('Day 1') || line.includes('DAY 1') || line.includes('第一天')) {
+          inDetailSection = true;
+        }
 
-          if (cleanName.length > 1 && cleanName.length < 20 && !cleanName.includes('出發') && !cleanName.includes('前往') && !cleanName.includes('車程') && !cleanName.includes('飯店') && !cleanName.includes(formData.start_location)) {
-            firstSpot = cleanName;
-            break; 
+        // 2. 尋找詳細區塊內的第一個景點
+        if (inDetailSection) {
+          if (line.match(/\d{2}:\d{2}/)) {
+            let potentialName = line.replace(/^\d{2}:\d{2}\s*[-─～]\s*\d{2}:\d{2}/, '').trim();
+            potentialName = potentialName.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:]/g, '').trim();
+
+            if (!potentialName || potentialName.length <= 1) {
+              if (i + 1 < lines.length) {
+                potentialName = lines[i + 1].replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:]/g, '').trim();
+              }
+            }
+
+            const noiseWords = ['出發', '前往', '車程', '交通', '飯店', '民宿', '抵達', '台北', '臺北', '出發地', '集合'];
+            const isNoise = noiseWords.some(w => potentialName.includes(w));
+
+            if (potentialName && potentialName.length >= 2 && potentialName.length < 25 && !isNoise) {
+              firstSpot = potentialName;
+              break; 
+            }
           }
         }
+      }
+
+      if (!firstSpot && selectedSpots.length > 0) {
+        firstSpot = selectedSpots[0];
       }
 
       if (firstSpot) {
@@ -496,7 +519,7 @@ export const Dashboard = () => {
                     <p className="text-xs font-semibold text-emerald-600 mt-5 tracking-wide">正在排程動線中，請稍候...</p>
                   </div>
                 ) : (
-                  /* 🚀 全新強化的 Markdown 樣式：將所有包含 Day 的標題 (h1, h2, h3) 強制放大字體並加粗！ */
+                  /* 🚀 Markdown 樣式：將 Day 標題 (h1, h2, h3) 強制放大字體並加粗！ */
                   <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-3 
                     prose-headings:text-emerald-800 prose-headings:font-black prose-headings:tracking-wide
                     prose-h1:text-2xl prose-h1:border-b prose-h1:pb-2 prose-h1:mt-6 prose-h1:mb-4
