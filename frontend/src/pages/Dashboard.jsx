@@ -85,78 +85,62 @@ export const Dashboard = () => {
     setMapQuery(combinedAddress || selectedCity);
   }, [selectedCity, selectedDistrict, detailRoad]);
 
+  // 🚀 高相容彈性解析器：兼顧 1| Pipe 格式與傳統條列，確保景點豐富不被誤刪
   const parseSpotsToArray = () => {
     if (!spotsRecommendation) return [];
     
     const normalizedText = spotsRecommendation.replace(/\r\n/g, '\n');
     const lines = normalizedText.split('\n');
-    let subSpots = [];
-    let currentSpot = null;
+    let parsedSpots = [];
 
+    // 策略 A：嘗試解析 1| 結構化 Pipe 格式
     lines.forEach(line => {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) return;
-
-       const listMatch = trimmedLine.match(/^(\d+[\.、\s]|-)\s*([^:：\n]+)/);
-      
-      if (listMatch) {
-        let cleanTitle = listMatch[2].replace(/[\*#_`\[\]\(\)【】\s📍🐾]/g, '').trim();
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      const parts = trimmed.split('|');
+      if (parts[0] === '1' && parts.length >= 3) {
+        const title = parts[1].trim().replace(/[\*#_`📍🐾]/g, '');
+        const location = parts.length >= 4 ? parts[2].trim() : title;
+        const desc = parts.length >= 4 ? parts[3].trim() : parts[2].trim();
         
-        const noiseWords = ["推薦理由", "景點候選", "清單", "💡", "貼心", "規劃師", "小叮嚀", "提示", "行程", "出發地", "注意"];
-        if (cleanTitle.length >= 2 && cleanTitle.length < 25 && !noiseWords.some(w => cleanTitle.includes(w))) {
-          if (currentSpot) {
-            subSpots.push(currentSpot);
-          }
-          currentSpot = {
-            title: cleanTitle,
-            rawMarkdown: `### ${cleanTitle}\n`
-          };
-          return;
+        if (title && title.length >= 2 && title.length < 30) {
+          parsedSpots.push({
+            title: title,
+            rawMarkdown: `📍 **地點**：${location}\n\n💡 ${desc}`
+          });
         }
       }
-
-     
-      if (currentSpot) {
-        currentSpot.rawMarkdown += trimmedLine + '\n\n';
-      }
     });
 
-    if (currentSpot) {
-      subSpots.push(currentSpot);
-    }
+    if (parsedSpots.length >= 3) return parsedSpots.slice(0, 100);
 
-    
-    if (subSpots.length >= 5) {
-      return subSpots.slice(0, 100);
-    }
+    // 策略 B：若未抓到 Pipe 格式，自動拆解標準條列（如 1. 奇美博物館 或 📍 奇美博物館）
+    let tempTitle = "";
+    let tempDesc = "";
 
-    const blocks = normalizedText.split(/(?=【[^】]+】|###|\n\s*\d+[\.、\s])/);
-    let backupList = [];
-
-    blocks.forEach(block => {
-      const trimmed = block.trim();
+    lines.forEach(line => {
+      const trimmed = line.trim();
       if (!trimmed) return;
 
-      let title = "";
-      const bracketMatch = trimmed.match(/【([^】]+)】/);
-      if (bracketMatch) {
-        title = bracketMatch[1].trim();
-      } else {
-        const firstLine = trimmed.split('\n')[0];
-        title = firstLine.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾]/g, '').trim();
+      const match = trimmed.match(/^(\d+[\.、\s]|📍|🔸|-|\*)\s*(.+)/) || trimmed.match(/【([^】]+)】/);
+      const isNoise = ["推薦理由", "景點", "清單", "規劃師", "指南", "小叮嚀", "注意事項", "Day", "區域"].some(w => trimmed.includes(w) && trimmed.length > 20);
+
+      if (match && !isNoise) {
+        if (tempTitle) {
+          parsedSpots.push({ title: tempTitle, rawMarkdown: tempDesc || tempTitle });
+        }
+        tempTitle = (match[2] || match[1]).replace(/[\*#_`\[\]\(\)【】\s📍🐾：:]/g, '').trim();
+        tempDesc = "";
+      } else if (tempTitle) {
+        tempDesc += trimmed + "\n";
       }
-
-      if (!title || title.length < 2 || title.length > 25) return;
-      const noiseWords = ["推薦理由", "景點候選", "清單" , "貼心", "規劃師", "小叮嚀", "提示", "行程", "您好", "哈囉", "建議", "出發地", "注意"];
-      if (noiseWords.some(word => title.includes(word))) return;
-
-      backupList.push({
-        title: title,
-        rawMarkdown: trimmed
-      });
     });
 
-    return backupList.slice(0, 100);
+    if (tempTitle) {
+      parsedSpots.push({ title: tempTitle, rawMarkdown: tempDesc || tempTitle });
+    }
+
+    return parsedSpots.filter(s => s.title && s.title.length >= 2 && s.title.length < 30).slice(0, 100);
   };
 
   const getPagedSpots = () => {
@@ -334,6 +318,20 @@ export const Dashboard = () => {
     }
   };
 
+  const handleCopyToClipboard = () => {
+    if (!finalItinerary) return;
+    navigator.clipboard.writeText(finalItinerary)
+      .then(() => {
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000); 
+      })
+      .catch((err) => console.error('無法複製行程: ', err));
+  };
+
+  const handlePrintPDF = () => {
+    window.print();
+  };
+
   const handleConfirmAndGenerateFinal = async () => {
     let finalSpotsPayload = accumulatedSpots;
     if (selectedSpots.length > 0) {
@@ -416,20 +414,6 @@ export const Dashboard = () => {
     }
   };
 
-  const handleCopyToClipboard = () => {
-    if (!finalItinerary) return;
-    navigator.clipboard.writeText(finalItinerary)
-      .then(() => {
-        setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 2000); 
-      })
-      .catch((err) => console.error('無法複製行程: ', err));
-  };
-
-  const handlePrintPDF = () => {
-    window.print();
-  };
-
   const allParsedSpots = parseSpotsToArray();
   const totalPages = Math.ceil(allParsedSpots.length / spotsPerPage);
   const currentPagedSpots = getPagedSpots();
@@ -451,7 +435,7 @@ export const Dashboard = () => {
           <h1 className="text-2xl font-bold text-gray-800" onClick={() => setStep(0)} style={{ cursor: 'pointer' }}>
             智遊台灣 Smart Tour
           </h1>
-          <span className="text-xs text-slate-500 font-medium">資管系畢業專題 – 國內智慧旅遊</span>
+          <span className="text-xs text-slate-500 font-medium">資管系畢業專題 – 國內智慧旅遊決策</span>
         </div>
       </header>
 
@@ -479,7 +463,7 @@ export const Dashboard = () => {
 
             <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col print-area">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
-                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專屬旅遊行程規劃</h2>
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專屬旅遊行程規劃表</h2>
                 <div className="flex gap-2 items-center">
                   <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
                     出發地：{formData.start_location} | {formData.days} 天 {formData.group_size} ({formData.transport})
@@ -539,7 +523,7 @@ export const Dashboard = () => {
                   <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 tracking-wide">
                     {loading ? (
                       <div className="h-full flex flex-col items-center justify-center py-12">
-                        <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div></div>
+                        <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]/]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div></div>
                         <p className="text-xs font-semibold text-emerald-600 mt-4">正在調度數據...</p>
                       </div>
                     ) : currentPagedSpots.length === 0 ? (
@@ -554,7 +538,14 @@ export const Dashboard = () => {
                         {currentPagedSpots.map((spot, idx) => {
                           const isChecked = selectedSpots.includes(spot.title);
                           return (
-                            <div key={idx} className={`p-3 border rounded-xl transition-all shadow-xs flex flex-col gap-2 ${isChecked ? 'bg-emerald-50/40 border-emerald-300' : 'bg-slate-50 border-slate-100 hover:bg-slate-100/80'}`}>
+                            <div 
+                              key={idx} 
+                              className={`p-3.5 rounded-xl transition-all shadow-none flex flex-col gap-2 ${
+                                isChecked 
+                                  ? 'bg-emerald-50 border border-emerald-50' 
+                                  : 'bg-slate-100/70 border border-slate-100 hover:bg-slate-200/50'
+                              }`}
+                            >
                               <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-2.5">
                                   <input 
