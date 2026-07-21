@@ -152,10 +152,12 @@ export const Dashboard = () => {
     }
   };
 
+  // 🚀 地圖來源邏輯修正：非 Step 6 時只顯示地點位置搜尋，不出現導航路線
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
 
+    // 只有在產出最終行程（Step 6）時才啟動起點到第一站的導航路線
     if (step === 6 && finalItinerary) { 
       const lines = finalItinerary.split('\n');
       let firstSpot = null;
@@ -200,16 +202,10 @@ export const Dashboard = () => {
       }
     }
 
-    if (mapQuery && mapQuery !== formData.start_location && mapQuery !== targetCity) {
-      const cleanQuery = mapQuery.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
-      return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || mapQuery)}&z=14&output=embed`;
-    }
-
-    if (formData.start_location === targetCity) {
-      return `https://maps.google.com/maps?q=${encodeURIComponent(targetCity + ' 景點')}&z=14&output=embed`;
-    }
-
-    return `https://maps.google.com/maps?saddr=${encodeURIComponent(formData.start_location)}&daddr=${encodeURIComponent(targetCity)}&dirflg=${travelMode}&output=embed`;
+    // Step 0 ~ Step 5：只顯示使用者當前輸入的完整地址/地點（純定位，無導航藍線）
+    const locationToDisplay = mapQuery || formData.start_location || targetCity;
+    const cleanQuery = locationToDisplay.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
+    return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || locationToDisplay)}&z=15&output=embed`;
   };
 
   // 全域 Enter 鍵按步切換
@@ -710,7 +706,7 @@ export const Dashboard = () => {
                               setStep(2);
                             }
                           }}
-                          placeholder="例如：介壽路、中正路等等..."
+                          placeholder="例如：台北車站、大坪林、二十張路105巷9號..."
                           className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
                         />
                       </div>
