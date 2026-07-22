@@ -152,6 +152,7 @@ export const Dashboard = () => {
     }
   };
 
+  // 🚀 地圖來源邏輯修正：非 Step 6 時只顯示地點位置搜尋，不出現導航路線
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
@@ -170,7 +171,6 @@ export const Dashboard = () => {
         if (inDetailSection) {
           if (line.match(/\d{2}:\d{2}/)) {
             let potentialName = line.replace(/^\d{2}:\d{2}\s*[-─～~]\s*\d{2}:\d{2}/, '').trim();
-            
             potentialName = potentialName.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:~\|]/g, '').trim();
 
             const noiseWords = ['出發', '前往', '車程', '交通', '飯店', '民宿', '抵達', '台北', '臺北', '出發地', '集合', '啟程', '跨縣市', '自駕'];
@@ -200,27 +200,27 @@ export const Dashboard = () => {
     return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || locationToDisplay)}&z=15&output=embed`;
   };
 
-  // 全域 Enter 鍵按步切換
+  // 全域 Enter 鍵切換步驟（已修復連跳 Bug）
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if (e.key === 'Enter') {
         if (step === 5 || step === 6) return;
 
-        if (step !== 4 && document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') {
-          return;
-        }
+        e.preventDefault();
+        
         if (step === 0) { 
-          e.preventDefault(); 
           if (selectedCity) setStep(1); 
         } 
         else if (step === 1) { 
-          e.preventDefault(); 
           setStep(2); 
         } 
-        else if (step === 2) { e.preventDefault(); setStep(3); } 
-        else if (step === 3) { e.preventDefault(); setStep(4); }
+        else if (step === 2) { 
+          setStep(3); 
+        } 
+        else if (step === 3) { 
+          setStep(4); 
+        }
         else if (step === 4) { 
-          e.preventDefault(); 
           if (formData.group_size && formData.group_size.trim() !== '') {
             handleRecommendSpots(); 
           }
@@ -690,20 +690,14 @@ export const Dashboard = () => {
                         </div>
                       )}
 
-                      {/* 輸入詳細道路/地標（選填） */}
+                      {/* 輸入詳細道路/地標（選填，已移除多餘的 onKeyDown） */}
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1.5">輸入詳細道路/地標（選填）</label>
                         <input 
                           type="text"
                           value={detailRoad}
                           onChange={(e) => setDetailRoad(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              setStep(2);
-                            }
-                          }}
-                          placeholder="例如：台北車站、大坪林、介壽路等等..."
+                          placeholder="例如：台北車站、大坪林、二十張路105巷9號..."
                           className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
                         />
                       </div>
@@ -776,7 +770,7 @@ export const Dashboard = () => {
                           })}
                         </div>
                         <div className="mt-2">
-                          <input type="text" placeholder="請輸入其他旅遊目的，輸入完按 Enter 新增標籤" className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" onKeyDown={(e) => { if (e.key === 'Enter' && e.target.value.trim() !== '') { e.preventDefault(); const newTag = e.target.value.trim(); let currentTags = formData.tags ? [...formData.tags] : []; if (!currentTags.includes(newTag)) { currentTags.push(newTag); } setFormData({ ...formData, tags: currentTags }); e.target.value = ''; } }} />
+                          <input type="text" placeholder="請輸入其他旅遊目的，輸入完按 Enter 新增標籤" className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" onKeyDown={(e) => { if (e.key === 'Enter' && e.target.value.trim() !== '') { e.preventDefault(); e.stopPropagation(); const newTag = e.target.value.trim(); let currentTags = formData.tags ? [...formData.tags] : []; if (!currentTags.includes(newTag)) { currentTags.push(newTag); } setFormData({ ...formData, tags: currentTags }); e.target.value = ''; } }} />
                           <p className="text-[10px] text-slate-400 mt-1"> 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
                           <div className="flex flex-wrap gap-1 mt-2">
                             {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].includes(t)).map(customTag => (
