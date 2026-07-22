@@ -349,8 +349,9 @@ export const Dashboard = () => {
     const topologyConstraintPrompt = `${userNeed || ''} 
     【資管專題動態排程約束律】：
     1. 使用者標記必定要去且已選進清單的景點為：[ ${selectedSpots.join(', ')} ]。在規劃各天行程表時，這些勾選景點「必須 100% 被完整排入」，絕對不准漏掉。
-    2. 行程路線規劃必須符合地理鄰近性邏輯。嚴禁出現硬接、跨區大幅度來回折返、或前一站跟下一站相隔極遠的極端動線。排程以「同區域、距離近優先」為首要導向。
-    3. 如果使用者勾選的景點數量太少，無法排滿總計 ${formData.days} 天的行程空檔，AI 必須根據當前路線軌跡，在相隔較遠的 A 點與 B 點中間，主動「穿插推薦 1~2 個完全順路、鄰近的免費熱門小景點或美食」，讓時間動線流暢飽滿且完全順路。`;
+    2. 使用者勾選了 ${selectedSpots.length} 個景點，預計行程天數為 ${formData.days} 天。若勾選景點數量過多（超過每天平均 4 個），請在【行程概要總覽】下方特別標註一行警示：「⚠️ 提醒：您選取的景點數量較多，部分景點停留時間將壓縮，且跨區拉車時間可能較長，請注意行程節奏。」
+    3. 行程路線規劃必須符合地理鄰近性邏輯。嚴禁出現硬接、跨區大幅度來回折返、或前一站跟下一站相隔極遠的極端動線。排程以「同區域、距離近優先」為首要導向。
+    4. 如果使用者勾選的景點數量太少，無法排滿總計 ${formData.days} 天的行程空檔，AI 必須根據當前路線軌跡，在相隔較遠的 A 點與 B 點中間，主動「穿插推薦 1~2 個完全順路、鄰近的免費熱門小景點或美食」，讓時間動線流暢飽滿且完全順路。`;
 
     await handleGenerateFinal(finalSpotsPayload, topologyConstraintPrompt);
   };
@@ -424,6 +425,10 @@ export const Dashboard = () => {
   const allParsedSpots = parseSpotsToArray();
   const totalPages = Math.ceil(allParsedSpots.length / spotsPerPage);
   const currentPagedSpots = getPagedSpots();
+
+  // 計算當前勾選景點數是否超過天數合理上限 (1天最多建議4個)
+  const maxRecommendedSpots = formData.days * 4;
+  const isOvercrowded = selectedSpots.length > maxRecommendedSpots;
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
@@ -529,14 +534,31 @@ export const Dashboard = () => {
             {step === 5 ? (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[620px] lg:col-span-1 animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
-                  <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"> 景點推薦名單</h2>
                     {selectedSpots.length > 0 && (
-                      <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-md font-bold">
+                      <span className={`text-xs border px-2 py-1 rounded-md font-bold ${
+                        isOvercrowded 
+                          ? 'bg-amber-50 text-amber-800 border-amber-300' 
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      }`}>
                         已勾選必去 {selectedSpots.length} 個景點
                       </span>
                     )}
                   </div>
+
+                  {/* 🚀 景點勾選數量過多警示 Banner */}
+                  {isOvercrowded && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-xs font-semibold mb-3 flex items-start gap-2 shadow-sm animate-fadeIn">
+                      <span className="text-base leading-none">⚠️</span>
+                      <div>
+                        <p className="font-extrabold text-amber-900 mb-0.5">勾選景點數量偏多提示</p>
+                        <p className="leading-relaxed">
+                          預計旅遊天數為 <span className="font-black text-amber-950">{formData.days} 天</span>，目前已勾選 <span className="font-black text-amber-950">{selectedSpots.length} 個景點</span>。景點安排過密可能導致拉車交通時間拉長、每個景點停留時間受限，建議斟酌勾選精華景點！
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 tracking-wide">
                     {loading ? (
@@ -690,7 +712,7 @@ export const Dashboard = () => {
                         </div>
                       )}
 
-                      {/* 輸入詳細道路/地標（選填，已移除多餘的 onKeyDown） */}
+                      {/* 輸入詳細道路/地標 */}
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1.5">輸入詳細道路/地標（選填）</label>
                         <input 
