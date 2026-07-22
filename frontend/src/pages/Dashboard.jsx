@@ -504,7 +504,12 @@ export const Dashboard = () => {
                     prose-h3:text-lg prose-h3:font-black prose-h3:text-emerald-700 prose-h3:mt-5 prose-h3:mb-2 prose-h3:bg-emerald-50/80 prose-h3:p-2.5 prose-h3:rounded-lg prose-h3:border-l-4 prose-h3:border-emerald-600
                     prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700 prose-strong:font-bold prose-strong:text-slate-900
                     prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1 prose-li:my-0.5">
-                    <ReactMarkdown>{finalItinerary.replace(/<br\s*\/?>/gi, '\n') || ''}</ReactMarkdown>
+                    <ReactMarkdown>
+                      {(finalItinerary || '')
+                        .replace(/<br\s*\/?>/gi, '\n')
+                        .replace(/\$\\rightarrow\$/g, '→')
+                        .replace(/\\rightarrow/g, '→')}
+                    </ReactMarkdown>
                   </div>
                 )}
               </div>
