@@ -697,7 +697,7 @@ export const Dashboard = () => {
                           type="text"
                           value={detailRoad}
                           onChange={(e) => setDetailRoad(e.target.value)}
-                          placeholder="例如：台北車站、大坪林、二十張路105巷9號..."
+                          placeholder="例如：台北車站、大坪林、二十張路..."
                           className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
                         />
                       </div>
