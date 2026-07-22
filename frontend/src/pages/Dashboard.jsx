@@ -23,6 +23,9 @@ const TAIWAN_DISTRICTS = {
   "臺東縣": ["臺東市", "成功鎮", "關山鎮", "卑南鄉", "大武鄉", "太麻里鄉", "東河鄉", "長濱鄉", "鹿野鄉", "池上鄉", "綠島鄉", "延平鄉", "海端鄉", "達仁鄉", "金峰鄉", "蘭嶼鄉"]
 };
 
+// 定義外島名單與對應交通點
+const OFFSHORE_ISLANDS = ["澎湖縣", "金門縣", "連江縣", "澎湖", "金門", "馬祖", "綠島", "蘭嶼", "琉球鄉"];
+
 export const Dashboard = () => {
   const [formData, setFormData] = useState({
     start_location: '臺北市',
@@ -31,6 +34,7 @@ export const Dashboard = () => {
     group_size: '2人',
     tags: [],
     transport: '自駕',
+    offshore_transit: '飛機', // 新增：外島交通方式 (飛機 / 輪船)
     start_time: '08:00'
   });
 
@@ -50,6 +54,9 @@ export const Dashboard = () => {
   const [finalItinerary, setFinalItinerary] = useState('');
   
   const [copySuccess, setCopySuccess] = useState(false);
+
+  // 景點過多彈窗鎖
+  const [showWarningModal, setShowWarningModal] = useState(false);
 
   // 地圖即時定位
   const [mapQuery, setMapQuery] = useState('臺北市');
@@ -80,6 +87,9 @@ export const Dashboard = () => {
     setFormData(prev => ({ ...prev, start_location: combinedAddress || selectedCity }));
     setMapQuery(combinedAddress || selectedCity);
   }, [selectedCity, selectedDistrict, detailRoad]);
+
+  // 判斷當前目的地是否包含外島
+  const isOffshoreSelected = formData.cities.some(c => OFFSHORE_ISLANDS.some(island => c.includes(island)));
 
   // 解析器
   const parseSpotsToArray = () => {
@@ -152,12 +162,33 @@ export const Dashboard = () => {
     }
   };
 
-  // 🚀 地圖來源邏輯修正：非 Step 6 時只顯示地點位置搜尋，不出現導航路線
+  // 🚀 地圖導航邏輯：外島依「搭船/飛機」導航至本島港口/機場
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
 
     if (step === 6 && finalItinerary) { 
+      const origin = formData.start_location;
+
+      // 如果選的是外島
+      if (isOffshoreSelected) {
+        let transitDestination = "";
+        if (formData.offshore_transit === '飛機') {
+          // 預設導航至台北松山機場 (或依出發地選擇)
+          transitDestination = origin.includes('高雄') || origin.includes('屏東') ? '高雄小港國際機場' : '臺北松山機場';
+        } else {
+          // 搭船碼頭對應
+          if (targetCity.includes('連江') || targetCity.includes('馬祖')) transitDestination = '基隆港西岸旅客碼頭';
+          else if (targetCity.includes('澎湖')) transitDestination = '嘉義布袋遊艇港';
+          else if (targetCity.includes('琉球')) transitDestination = '屏東東港鹽埔漁港碼頭';
+          else if (targetCity.includes('綠島') || targetCity.includes('蘭嶼')) transitDestination = '臺東富岡漁港';
+          else transitDestination = '基隆港西岸旅客碼頭';
+        }
+
+        return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(transitDestination)}&dirflg=${travelMode}&output=embed`;
+      }
+
+      // 本島地區正常導航
       const lines = finalItinerary.split('\n');
       let firstSpot = null;
       let inDetailSection = false;
@@ -168,18 +199,16 @@ export const Dashboard = () => {
           inDetailSection = true;
         }
 
-        if (inDetailSection) {
-          if (line.match(/\d{2}:\d{2}/)) {
-            let potentialName = line.replace(/^\d{2}:\d{2}\s*[-─～~]\s*\d{2}:\d{2}/, '').trim();
-            potentialName = potentialName.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:~\|]/g, '').trim();
+        if (inDetailSection && line.match(/\d{2}:\d{2}/)) {
+          let potentialName = line.replace(/^\d{2}:\d{2}\s*[-─～~]\s*\d{2}:\d{2}/, '').trim();
+          potentialName = potentialName.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:~\|]/g, '').trim();
 
-            const noiseWords = ['出發', '前往', '車程', '交通', '飯店', '民宿', '抵達', '台北', '臺北', '出發地', '集合', '啟程', '跨縣市', '自駕'];
-            const isNoise = noiseWords.some(w => potentialName.includes(w));
+          const noiseWords = ['出發', '前往', '車程', '交通', '飯店', '民宿', '抵達', '台北', '臺北', '出發地', '集合', '啟程', '跨縣市', '自駕', '機場', '碼頭', '登機'];
+          const isNoise = noiseWords.some(w => potentialName.includes(w));
 
-            if (potentialName && potentialName.length >= 2 && potentialName.length < 25 && !isNoise) {
-              firstSpot = potentialName;
-              break; 
-            }
+          if (potentialName && potentialName.length >= 2 && potentialName.length < 25 && !isNoise) {
+            firstSpot = potentialName;
+            break; 
           }
         }
       }
@@ -189,7 +218,6 @@ export const Dashboard = () => {
       }
 
       if (firstSpot) {
-        const origin = formData.start_location;
         const secureDestination = firstSpot.includes(targetCity.substring(0, 2)) ? firstSpot : `${targetCity}${firstSpot}`;
         return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(secureDestination)}&dirflg=${travelMode}&output=embed`;
       }
@@ -200,7 +228,6 @@ export const Dashboard = () => {
     return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || locationToDisplay)}&z=15&output=embed`;
   };
 
-  // 全域 Enter 鍵切換步驟（已修復連跳 Bug）
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if (e.key === 'Enter') {
@@ -215,8 +242,12 @@ export const Dashboard = () => {
           setStep(2); 
         } 
         else if (step === 2) { 
-          setStep(3); 
-        } 
+          // 若選外島進入 step 2.5(外島專用頁)，否則進 step 3
+          setStep(isOffshoreSelected ? 2.5 : 3); 
+        }
+        else if (step === 2.5) {
+          setStep(3);
+        }
         else if (step === 3) { 
           setStep(4); 
         }
@@ -229,7 +260,7 @@ export const Dashboard = () => {
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [step, formData, selectedCity]);
+  }, [step, formData, selectedCity, isOffshoreSelected]);
 
   const handleCheckboxChange = (field, value) => {
     const currentList = [...formData[field]];
@@ -260,7 +291,7 @@ export const Dashboard = () => {
           city: formData.cities.join(','),
           days: formData.days,             
           group_size: formData.group_size,
-          tags: formData.tags,
+          tags: isOffshoreSelected ? [...formData.tags, `外島交通:${formData.offshore_transit}`] : formData.tags,
           accumulated_spots: accumulatedSpots || ""
         })
       });
@@ -339,7 +370,19 @@ export const Dashboard = () => {
     window.print();
   };
 
-  const handleConfirmAndGenerateFinal = async () => {
+  const maxRecommendedSpots = formData.days * 4;
+  const isOvercrowded = selectedSpots.length > maxRecommendedSpots;
+
+  const handleConfirmAndGenerateFinal = () => {
+    if (isOvercrowded) {
+      setShowWarningModal(true);
+    } else {
+      executeGenerateFinal();
+    }
+  };
+
+  const executeGenerateFinal = async () => {
+    setShowWarningModal(false);
     let finalSpotsPayload = accumulatedSpots;
     if (selectedSpots.length > 0) {
       const selectedString = selectedSpots.join('+');
@@ -349,9 +392,10 @@ export const Dashboard = () => {
     const topologyConstraintPrompt = `${userNeed || ''} 
     【資管專題動態排程約束律】：
     1. 使用者標記必定要去且已選進清單的景點為：[ ${selectedSpots.join(', ')} ]。在規劃各天行程表時，這些勾選景點「必須 100% 被完整排入」，絕對不准漏掉。
-    2. 使用者勾選了 ${selectedSpots.length} 個景點，預計行程天數為 ${formData.days} 天。若勾選景點數量過多（超過每天平均 4 個），請在【行程概要總覽】下方特別標註一行警示：「⚠️ 提醒：您選取的景點數量較多，部分景點停留時間將壓縮，且跨區拉車時間可能較長，請注意行程節奏。」
-    3. 行程路線規劃必須符合地理鄰近性邏輯。嚴禁出現硬接、跨區大幅度來回折返、或前一站跟下一站相隔極遠的極端動線。排程以「同區域、距離近優先」為首要導向。
-    4. 如果使用者勾選的景點數量太少，無法排滿總計 ${formData.days} 天的行程空檔，AI 必須根據當前路線軌跡，在相隔較遠的 A 點與 B 點中間，主動「穿插推薦 1~2 個完全順路、鄰近的免費熱門小景點或美食」，讓時間動線流暢飽滿且完全順路。`;
+    ${isOffshoreSelected ? `2. 【外島交通約束】：使用者選擇搭乘【${formData.offshore_transit}】前往 ${formData.cities.join(',')}。請在 Day 1 第一站前精準標註本島至外島的交通接駁（如機場報到/碼頭搭船）與預估航程時間。` : ''}
+    3. 使用者勾選了 ${selectedSpots.length} 個景點，預計行程天數為 ${formData.days} 天。若勾選景點數量較多，請在【行程概要總覽】下方特別標註一行警示：「⚠️ 提醒：您選取的景點數量較多，部分景點停留時間將壓縮，請注意行程節奏。」
+    4. 行程路線規劃必須符合地理鄰近性邏輯。嚴禁出現硬接、跨區大幅度來回折返、或前一站跟下一站相隔極遠的極端動線。排程以「同區域、距離近優先」為首要導向。
+    5. 如果使用者勾選的景點數量太少，無法排滿總計 ${formData.days} 天的行程空檔，AI 必須根據當前路線軌跡，主動「穿插推薦 1~2 個完全順路、鄰近的免費熱門小景點或美食」。`;
 
     await handleGenerateFinal(finalSpotsPayload, topologyConstraintPrompt);
   };
@@ -368,7 +412,7 @@ export const Dashboard = () => {
           accumulated_spots: targetSpots || accumulatedSpots, 
           user_need: OverrideUserNeed || userNeed || `出發地：${formData.start_location}，預計行程天數：${formData.days}天`, 
           city: formData.cities.join(','),       
-          transport: formData.transport || '自駕',
+          transport: isOffshoreSelected ? `外島(${formData.offshore_transit})+當地${formData.transport}` : formData.transport,
           start_location: formData.start_location, 
           start_time: formData.start_time || '08:00'
         })
@@ -426,23 +470,53 @@ export const Dashboard = () => {
   const totalPages = Math.ceil(allParsedSpots.length / spotsPerPage);
   const currentPagedSpots = getPagedSpots();
 
-  // 計算當前勾選景點數是否超過天數合理上限 (1天最多建議4個)
-  const maxRecommendedSpots = formData.days * 4;
-  const isOvercrowded = selectedSpots.length > maxRecommendedSpots;
-
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 relative">
+      {/* 🚀 列印與 PDF 匯出優化：徹底隱藏地圖區塊與頂部導覽列，消除列印空白頁 */}
       <style>{`
         @media print {
           body, html { background-color: #ffffff !important; color: #000000 !important; }
-          header, .mb-6, iframe, h2, .no-print, form, h3, .mt-6 { display: none !important; }
+          header, .mb-6, iframe, h2, .no-print, form, h3, .mt-6, .map-section { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
           main { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
           .print-area { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
           .bg-slate-50\\/70 { background: transparent !important; border: none !important; padding: 0 !important; }
         }
       `}</style>
 
-      <header className="border-b bg-white shadow-sm">
+      {/* 景點數量過多攔截 Modal 彈窗 */}
+      {showWarningModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-4">
+            <div className="flex items-center gap-3 text-amber-600">
+              <span className="text-3xl">⚠️</span>
+              <h3 className="text-lg font-extrabold text-slate-900 m-0">行程可能太緊湊！</h3>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed m-0 bg-amber-50/60 border border-amber-200/80 p-3.5 rounded-xl">
+              您規劃了 <span className="font-extrabold text-amber-900">{formData.days} 天</span> 的行程，但目前勾選了 <span className="font-extrabold text-amber-900">{selectedSpots.length} 個必去景點</span>（建議平均每天最多 3~4 個）。
+              <br /><br />
+              景點過多會導致<span className="font-bold text-slate-900">拉車時間大幅變長、景點停留時間受限</span>，影響旅遊品質。
+            </p>
+
+            <div className="flex gap-3 mt-2">
+              <button 
+                onClick={() => setShowWarningModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                ↩️ 返回修改（刪減景點）
+              </button>
+              <button 
+                onClick={executeGenerateFinal}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
+              >
+                ⚡ 確定要去，強行排程
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <header className="border-b bg-white shadow-sm no-print">
         <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-800" onClick={() => setStep(0)} style={{ cursor: 'pointer' }}>
             智遊台灣 Smart Tour
@@ -452,22 +526,23 @@ export const Dashboard = () => {
       </header>
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6">
-        <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm no-print">
           <div className="flex justify-between items-center mb-2">
             <span className="text-xs font-bold text-emerald-600 tracking-wider">SYSTEM PROGRESS</span>
-            <span className="text-xs font-semibold text-slate-400">目前步驟：{step + 1} / 7</span>
+            <span className="text-xs font-semibold text-slate-400">目前步驟：{Math.floor(step + 1)} / 7</span>
           </div>
           <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
             <div className="h-full bg-emerald-500 transition-all duration-500 ease-out" style={{ width: `${(step + 1) * 14.28}%` }}></div>
           </div>
         </div>
 
-        {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg font-semibold text-sm mb-6 shadow-sm">{errorMsg}</div>}
+        {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg font-semibold text-sm mb-6 shadow-sm no-print">{errorMsg}</div>}
 
         {step === 6 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（出發地 ➔ 目的地首站）</h2>
+            {/* 🚀 地圖區域加上 map-section class，確保 PDF 匯出時 100% 隱藏不留空白 */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 map-section no-print">
+              <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（出發地 ➔ 目的地首站/搭乘處）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Navigation"></iframe>
               </div>
@@ -478,7 +553,7 @@ export const Dashboard = () => {
                 <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專屬旅遊行程規劃表</h2>
                 <div className="flex gap-2 items-center">
                   <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
-                    出發地：{formData.start_location} | {formData.days} 天 {formData.group_size} ({formData.transport})
+                    出發地：{formData.start_location} | {formData.days} 天 {formData.group_size} ({isOffshoreSelected ? `外島:${formData.offshore_transit}` : formData.transport})
                   </span>
                   {formData.cities.map(c => <span key={c} className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-semibold">{c}</span>)}
                 </div>
@@ -547,14 +622,13 @@ export const Dashboard = () => {
                     )}
                   </div>
 
-                  {/* 🚀 景點勾選數量過多警示 Banner */}
                   {isOvercrowded && (
                     <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-xs font-semibold mb-3 flex items-start gap-2 shadow-sm animate-fadeIn">
                       <span className="text-base leading-none">⚠️</span>
                       <div>
-                        <p className="font-extrabold text-amber-900 mb-0.5">勾選景點數量偏多提示</p>
+                        <p className="font-extrabold text-amber-900 mb-0.5">景點數量偏多提示</p>
                         <p className="leading-relaxed">
-                          預計旅遊天數為 <span className="font-black text-amber-950">{formData.days} 天</span>，目前已勾選 <span className="font-black text-amber-950">{selectedSpots.length} 個景點</span>。景點安排過密可能導致拉車交通時間拉長、每個景點停留時間受限，建議斟酌勾選精華景點！
+                          預計旅遊天數為 <span className="font-black text-amber-950">{formData.days} 天</span>，已勾選 <span className="font-black text-amber-950">{selectedSpots.length} 個景點</span>。景點過多可能導致拉車交通時間拉長，點擊確定時系統將提供優化建議與確認。
                         </p>
                       </div>
                     </div>
@@ -691,7 +765,6 @@ export const Dashboard = () => {
                     <div className="space-y-4 animate-fadeIn">
                       <h2 className="text-base font-bold text-slate-900 mb-1">第二步：選擇詳細出發位置</h2>
                       
-                      {/* 選擇行政區 */}
                       {selectedCity && TAIWAN_DISTRICTS[selectedCity] && (
                         <div>
                           <label className="block text-xs font-bold text-slate-500 mb-2">選擇行政區（{selectedCity}）</label>
@@ -712,7 +785,6 @@ export const Dashboard = () => {
                         </div>
                       )}
 
-                      {/* 輸入詳細道路/地標 */}
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1.5">輸入詳細道路/地標（選填）</label>
                         <input 
@@ -755,6 +827,56 @@ export const Dashboard = () => {
                     </div>
                     <div className="flex justify-between mt-4">
                       <button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
+                      <button 
+                        onClick={() => setStep(isOffshoreSelected ? 2.5 : 3)} 
+                        className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all"
+                      >
+                        下一步
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 🚀 外島專用加頁：選擇跨海交通方式 */}
+                {step === 2.5 && (
+                  <div className="flex-1 flex flex-col justify-between animate-fadeIn">
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900 mb-1">選擇離島跨海交通方式</h2>
+                      <p className="text-xs text-slate-500 mb-4">
+                        偵測到您選擇了離島目的地（<span className="font-bold text-emerald-700">{formData.cities.filter(c => OFFSHORE_ISLANDS.some(i => c.includes(i))).join('、')}</span>），請選擇您預計採用的跨海交通方式：
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-4 mt-6">
+                        <div 
+                          onClick={() => setFormData({ ...formData, offshore_transit: '飛機' })}
+                          className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col items-center gap-2 ${
+                            formData.offshore_transit === '飛機'
+                              ? 'border-emerald-500 bg-emerald-50/60 shadow-md'
+                              : 'border-slate-200 bg-slate-50 hover:bg-slate-100/80'
+                          }`}
+                        >
+                          <span className="text-4xl">✈️</span>
+                          <span className="text-sm font-extrabold text-slate-800">搭乘飛機</span>
+                          <span className="text-[11px] text-slate-500 text-center">快速省時，導航將自動引導至本島機場</span>
+                        </div>
+
+                        <div 
+                          onClick={() => setFormData({ ...formData, offshore_transit: '輪船' })}
+                          className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col items-center gap-2 ${
+                            formData.offshore_transit === '輪船'
+                              ? 'border-emerald-500 bg-emerald-50/60 shadow-md'
+                              : 'border-slate-200 bg-slate-50 hover:bg-slate-100/80'
+                          }`}
+                        >
+                          <span className="text-4xl">🚢</span>
+                          <span className="text-sm font-extrabold text-slate-800">搭乘輪船</span>
+                          <span className="text-[11px] text-slate-500 text-center">悠閒渡輪，導航將自動引導至出海港口碼頭</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between mt-6">
+                      <button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
                       <button onClick={() => setStep(3)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all">下一步</button>
                     </div>
                   </div>
@@ -774,7 +896,7 @@ export const Dashboard = () => {
                         <div className="flex justify-between text-[10px] text-slate-400 px-1 mt-1"><span>1天</span><span>2天</span><span>3天</span><span>4天</span><span>5天</span><span>6天</span><span>7天</span></div>
                       </div>
                       <div className="mb-4">
-                        <label className="block text-xs font-semibold text-slate-600 mb-2">交通工具</label>
+                        <label className="block text-xs font-semibold text-slate-600 mb-2">當地交通工具</label>
                         <div className="flex gap-2">
                           {['自駕', '大眾運輸'].map(t => (
                             <button key={t} type="button" onClick={() => setFormData({ ...formData, transport: t })} className={`flex-1 py-2 text-center rounded-xl text-xs font-semibold border transition-all ${formData.transport === t ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>{t}</button>
@@ -803,7 +925,7 @@ export const Dashboard = () => {
                       </div>
                     </div>
                     <div className="flex justify-between mt-6">
-                      <button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
+                      <button onClick={() => setStep(isOffshoreSelected ? 2.5 : 2)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
                       <button onClick={() => setStep(4)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">下一步</button>
                     </div>
                   </div>
@@ -824,7 +946,7 @@ export const Dashboard = () => {
             )}
 
             {step === 5 ? (
-              <section className="flex flex-col gap-6 lg:col-span-1 animate-fadeIn lg:sticky lg:top-6">
+              <section className="flex flex-col gap-6 lg:col-span-1 animate-fadeIn lg:sticky lg:top-6 no-print">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                   <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖智慧導航</h2>
                   <div className="h-[240px] rounded-xl overflow-hidden border border-slate-100">
@@ -860,7 +982,7 @@ export const Dashboard = () => {
                 </div>
               </section>
             ) : (
-              <section className="flex flex-col gap-4">
+              <section className="flex flex-col gap-4 no-print">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5 flex-1 flex flex-col">
                   <h2 className="text-base font-bold text-slate-900 mb-1">區域地圖智慧導航（動態路線預覽）</h2>
                   <div className="mt-2 h-[460px] rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
