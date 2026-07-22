@@ -762,7 +762,7 @@ export const Dashboard = () => {
                       <div className="mb-2">
                         <label className="block text-xs font-semibold text-slate-600 mb-2">旅遊目的 / 偏好標籤</label>
                         <div className="flex flex-wrap gap-2 mb-3">
-                          {['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].map(tag => {
+                          {['情侶約會', '遊樂園', '親子同遊', '網美打卡', '大自然放鬆'].map(tag => {
                             const isSelected = formData.tags && formData.tags.includes(tag);
                             return (
                               <button key={tag} type="button" onClick={() => { let newTags = formData.tags ? [...formData.tags] : []; if (isSelected) { newTags = newTags.filter(t => t !== tag); } else { newTags.push(tag); } setFormData({ ...formData, tags: newTags }); }} className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all ${isSelected ? 'bg-emerald-50 text-emerald-700 border-emerald-500 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>{tag}</button>
@@ -773,7 +773,7 @@ export const Dashboard = () => {
                           <input type="text" placeholder="請輸入其他旅遊目的，輸入完按 Enter 新增標籤" className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" onKeyDown={(e) => { if (e.key === 'Enter' && e.target.value.trim() !== '') { e.preventDefault(); e.stopPropagation(); const newTag = e.target.value.trim(); let currentTags = formData.tags ? [...formData.tags] : []; if (!currentTags.includes(newTag)) { currentTags.push(newTag); } setFormData({ ...formData, tags: currentTags }); e.target.value = ''; } }} />
                           <p className="text-[10px] text-slate-400 mt-1"> 輸入你想去的目的後按 Enter 鍵即可成功加入標籤清單。</p>
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '美食吃貨', '大自然放鬆'].includes(t)).map(customTag => (
+                            {formData.tags && formData.tags.filter(t => !['情侶約會', '遊樂園', '親子同遊', '網美打卡', '大自然放鬆'].includes(t)).map(customTag => (
                               <span key={customTag} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] px-2.5 py-1 rounded-md border border-slate-200">{customTag}<button type="button" className="font-bold text-slate-400 hover:text-slate-600" onClick={() => { let newTags = formData.tags ? [...formData.tags] : []; newTags = newTags.filter(t => t !== customTag); setFormData({ ...formData, tags: newTags }); }}>×</button></span>
                             ))}
                           </div>
