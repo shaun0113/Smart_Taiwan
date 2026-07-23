@@ -2,6 +2,7 @@ import os
 import pymysql  
 import json
 import logging
+import time
 from google import genai
 from google.genai import types
 
@@ -18,32 +19,34 @@ class SmartTourEngine:
     def __init__(self):
         self.db_config = {
             "host": os.getenv("DB_HOST", "127.0.0.1"),
-            "port": int(os.getenv("DB_PORT", 3306)),
+            "port": int(os.getenv("DB_PORT", 18230)),
             "user": os.getenv("DB_USER", "root"),
-            "password": os.getenv("DB_PASSWORD", "Yjo494m6.."),          
+            "password": os.getenv("DB_PASSWORD", ""),          
             "database": os.getenv("DB_NAME", "smart_tour_taiwan"),    
             "charset": "utf8mb4",
             "cursorclass": pymysql.cursors.DictCursor
         }
         
-        self.model_name = 'gemini-3.5-flash'
+        self.model_name = 'gemini-2.5-flash'
         
+        # 🚀 支援 GEMINI_API_KEYS (用逗號隔開)，同時相容舊版 GEMINI_API_KEY
         self.api_keys = []
-        for i in range(1, 5):
-            key_name = f"GEMINI_API_KEY_{i}" if i > 1 else "GEMINI_API_KEY"
-            val = os.getenv(key_name)
-            if val:
-                self.api_keys.append(val)
+        raw_keys = os.getenv("GEMINI_API_KEYS", os.getenv("GEMINI_API_KEY", ""))
+        
+        if raw_keys:
+            self.api_keys = [k.strip() for k in raw_keys.split(",") if k.strip()]
+        
+        # 備援：若沒抓到，再去掃 GEMINI_API_KEY_1, GEMINI_API_KEY_2...
+        if not self.api_keys:
+            for i in range(1, 5):
+                val = os.getenv(f"GEMINI_API_KEY_{i}")
+                if val:
+                    self.api_keys.append(val.strip())
                 
         if not self.api_keys:
-            logger.warning("🚨 未偵測到 GEMINI_API_KEY 環境變數。")
-
-    def _get_genai_client(self, attempt: int):
-        if not self.api_keys:
-            return None
-        target_index = attempt % len(self.api_keys)
-        logger.info(f"🔄 調度第 {target_index + 1} 把 Gemini 金鑰...")
-        return genai.Client(api_key=self.api_keys[target_index])
+            logger.warning("🚨 未偵測到任何 GEMINI_API_KEYS 環境變數。")
+        else:
+            logger.info(f"🔑 成功加載 {len(self.api_keys)} 組 Gemini API 金鑰！")
 
     def _query_spots_from_db(self, cities: list) -> list:
         try:
@@ -108,11 +111,12 @@ class SmartTourEngine:
         {json.dumps(db_spots, ensure_ascii=False)}
         """
 
-        for attempt in range(3):
-            client = self._get_genai_client(attempt)
-            if not client:
-                continue
+        # 🚀 輪詢所有 Key，遇到 429/503 自動嘗試下一張 Key
+        last_error = None
+        for index, key in enumerate(self.api_keys):
             try:
+                logger.info(f"🔄 嘗試第 {index + 1} 把 Gemini 金鑰...")
+                client = genai.Client(api_key=key)
                 response = client.models.generate_content(
                     model=self.model_name,
                     contents=user_prompt,
@@ -124,9 +128,11 @@ class SmartTourEngine:
                 if response.text:
                     return response.text
             except Exception as e:
-                logger.warning(f"⚠️ 第 {attempt + 1} 次請求受挫: {e}")
+                logger.warning(f"⚠️ 第 {index + 1} 把 Key 請求受挫 ({e})，準備切換下一把...")
+                last_error = e
+                time.sleep(1)
         
-        return "景點海選引擎發生異常，請稍後再試。"
+        return f"景點海選引擎發生異常：{last_error}"
 
     def analyze_selection(self, user_choice: str, spots_recommendation: str, accumulated_spots: str, user_need: str):
         safe_user_choice = user_choice if user_choice is not None else ""
@@ -142,11 +148,9 @@ class SmartTourEngine:
         只輸出 JSON: {{"status": "CONTINUE", "accumulated_spots": "景點A + 景點B", "msg": "回應"}}
         """
 
-        for attempt in range(3):
-            client = self._get_genai_client(attempt)
-            if not client:
-                continue
+        for index, key in enumerate(self.api_keys):
             try:
+                client = genai.Client(api_key=key)
                 response = client.models.generate_content(
                     model=self.model_name,
                     contents=guardrail_prompt,
@@ -155,7 +159,8 @@ class SmartTourEngine:
                 result = json.loads(response.text.strip())
                 return result["status"], result["accumulated_spots"], result["msg"]
             except Exception as e:
-                logger.warning(f"⚠️ 意圖網閘連線重試中... ({e})")
+                logger.warning(f"⚠️ 意圖網閘連線重試中... Key #{index + 1} ({e})")
+                time.sleep(1)
                 
         return "CONTINUE", safe_accumulated, f"已記錄需求：『{safe_user_choice}』"
 
@@ -175,18 +180,20 @@ class SmartTourEngine:
         需求：{user_need}
         """
         
-        for attempt in range(3):
-            client = self._get_genai_client(attempt)
-            if not client:
-                continue
+        last_error = None
+        for index, key in enumerate(self.api_keys):
             try:
+                logger.info(f"🔄 最終行程產生中，使用第 {index + 1} 把 Key...")
+                client = genai.Client(api_key=key)
                 response = client.models.generate_content(model=self.model_name, contents=prompt)
                 if response.text:
                     return response.text
             except Exception as e:
-                logger.warning(f"⚠️最終行程生成重試中... ({e})")
+                logger.warning(f"⚠️ 最終行程生成 Key #{index + 1} 重試中... ({e})")
+                last_error = e
+                time.sleep(1)
                 
-        return "最終行程生成引擎發生異常，請稍後重試。"
+        return f"最終行程生成引擎發生異常：{last_error}"
 
     def modify_itinerary(self, current_itinerary: str, modification_demand: str) -> str:
         if not self.api_keys:
@@ -194,15 +201,14 @@ class SmartTourEngine:
 
         prompt = f"微調指令：『{modification_demand}』\n現有行程：\n{current_itinerary}"
         
-        for attempt in range(3):
-            client = self._get_genai_client(attempt)
-            if not client:
-                continue
+        for index, key in enumerate(self.api_keys):
             try:
+                client = genai.Client(api_key=key)
                 response = client.models.generate_content(model=self.model_name, contents=prompt)
                 if response.text:
                     return response.text
             except Exception as e:
-                logger.warning(f"行程微調重試中... ({e})")
+                logger.warning(f"行程微調 Key #{index + 1} 重試中... ({e})")
+                time.sleep(1)
                 
         raise Exception("微調引擎發生異常。")
