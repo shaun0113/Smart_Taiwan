@@ -1,9 +1,12 @@
 import os
+import time
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 from dotenv import load_dotenv
+
+import google.generativeai as genai
 
 from smart_tour_engine import SmartTourEngine
 
@@ -19,7 +22,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+RAW_KEYS = os.getenv("GEMINI_API_KEYS", os.getenv("GEMINI_API_KEY", ""))
+API_KEYS = [k.strip() for k in RAW_KEYS.split(",") if k.strip()]
+
+def call_gemini_with_fallback(prompt: str, model_name: str = "gemini-1.5-flash") -> str:
+    """
+    帶有自動轉移與輪詢機制的 Gemini 呼叫函式。
+    當某一組 Key 遇到 429 額度超限或 503 服務忙碌時，自動切換至下一組 Key。
+    """
+    if not API_KEYS:
+        raise ValueError("環境變數中未偵測到任何 GEMINI_API_KEY 或 GEMINI_API_KEYS！")
+
+    last_exception = None
+
+    for index, key in enumerate(API_KEYS):
+        try:
+            genai.configure(api_key=key)
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            return response.text
+
+        except Exception as e:
+            err_msg = str(e)
+            # 偵測是否為 429 額度用盡或 503 伺服器超載/忙碌
+            if any(code in err_msg for code in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"]):
+                print(f"⚠️ API Key #{index + 1} 觸發流量限制/服務忙碌 ({err_msg[:60]}...)，自動切換至下一組 Key...")
+                last_exception = e
+                time.sleep(1)
+                continue
+            else:
+                # 其他非限流類的異常，紀錄後嘗試下一個 Key
+                print(f"❌ API Key #{index + 1} 發生錯誤: {err_msg}")
+                last_exception = e
+                continue
+
+    raise RuntimeError(f"所有 Gemini API Keys 皆已耗盡或連線失敗。最後錯誤：{last_exception}")
+
+# 初始化行程引擎
 engine = SmartTourEngine()
+
+if hasattr(engine, 'call_llm'):
+    engine.call_llm = call_gemini_with_fallback
+# ---------------------------------------------------------
 
 class RecommendRequest(BaseModel):
     city: str  
@@ -90,7 +134,7 @@ async def generate_final(req: FinalItineraryRequest):
         result = engine.generate_final_itinerary(
             accumulated_spots=req.accumulated_spots,
             user_need=req.user_need,
-            city=req.city,         
+            city=req.city,          
             transport=req.transport,
             start_location=req.start_location, 
             start_time=req.start_time        
