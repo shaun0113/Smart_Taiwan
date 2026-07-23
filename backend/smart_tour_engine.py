@@ -28,7 +28,7 @@ class SmartTourEngine:
         }
         
         # 使用官方最新穩定版模型名稱
-        self.model_name = 'gemini-2.5-flash'
+        self.model_name = 'gemini-flash-latest'
         
         # 支援 GEMINI_API_KEYS (逗號分隔多組 Key)，並向下相容 GEMINI_API_KEY / GEMINI_API_KEY_X
         self.api_keys = []
