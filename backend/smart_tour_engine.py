@@ -19,7 +19,7 @@ class SmartTourEngine:
     def __init__(self):
         self.db_config = {
             "host": os.getenv("DB_HOST", "127.0.0.1"),
-            "port": int(os.getenv("DB_PORT", 18230)),
+            "port": int(os.getenv("DB_PORT", 3306)),
             "user": os.getenv("DB_USER", "root"),
             "password": os.getenv("DB_PASSWORD", ""),          
             "database": os.getenv("DB_NAME", "smart_tour_taiwan"),    
@@ -27,16 +27,16 @@ class SmartTourEngine:
             "cursorclass": pymysql.cursors.DictCursor
         }
         
+        # 使用官方最新穩定版模型名稱
         self.model_name = 'gemini-2.5-flash'
         
-        # 🚀 支援 GEMINI_API_KEYS (用逗號隔開)，同時相容舊版 GEMINI_API_KEY
+        # 支援 GEMINI_API_KEYS (逗號分隔多組 Key)，並向下相容 GEMINI_API_KEY / GEMINI_API_KEY_X
         self.api_keys = []
         raw_keys = os.getenv("GEMINI_API_KEYS", os.getenv("GEMINI_API_KEY", ""))
         
         if raw_keys:
             self.api_keys = [k.strip() for k in raw_keys.split(",") if k.strip()]
         
-        # 備援：若沒抓到，再去掃 GEMINI_API_KEY_1, GEMINI_API_KEY_2...
         if not self.api_keys:
             for i in range(1, 5):
                 val = os.getenv(f"GEMINI_API_KEY_{i}")
@@ -111,11 +111,10 @@ class SmartTourEngine:
         {json.dumps(db_spots, ensure_ascii=False)}
         """
 
-        # 🚀 輪詢所有 Key，遇到 429/503 自動嘗試下一張 Key
         last_error = None
         for index, key in enumerate(self.api_keys):
             try:
-                logger.info(f"🔄 嘗試第 {index + 1} 把 Gemini 金鑰...")
+                logger.info(f"🔄 景點推薦中，嘗試第 {index + 1} 把 Key...")
                 client = genai.Client(api_key=key)
                 response = client.models.generate_content(
                     model=self.model_name,
@@ -159,7 +158,7 @@ class SmartTourEngine:
                 result = json.loads(response.text.strip())
                 return result["status"], result["accumulated_spots"], result["msg"]
             except Exception as e:
-                logger.warning(f"⚠️ 意圖網閘連線重試中... Key #{index + 1} ({e})")
+                logger.warning(f"⚠️ 意圖分析 Key #{index + 1} 重試中... ({e})")
                 time.sleep(1)
                 
         return "CONTINUE", safe_accumulated, f"已記錄需求：『{safe_user_choice}』"
@@ -183,7 +182,7 @@ class SmartTourEngine:
         last_error = None
         for index, key in enumerate(self.api_keys):
             try:
-                logger.info(f"🔄 最終行程產生中，使用第 {index + 1} 把 Key...")
+                logger.info(f"🔄 最終行程生成中，使用第 {index + 1} 把 Key...")
                 client = genai.Client(api_key=key)
                 response = client.models.generate_content(model=self.model_name, contents=prompt)
                 if response.text:
