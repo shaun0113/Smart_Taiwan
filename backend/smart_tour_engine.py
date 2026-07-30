@@ -170,10 +170,11 @@ class SmartTourEngine:
         spots_context = accumulated_spots if accumulated_spots else "請依照前述海選推薦名單排程。"
         prompt = f"""
         你現在是台灣智慧旅遊規劃師。請針對旅客最終選定的景點動態生成行程表。
-        出發地：{start_location}，時間：{start_time}，目的地：{city}，交通：{transport}。
+        出發地：{start_location}，出發時間：{start_time}，目的地：{city}，交通：{transport}。
 
         最上方建立【行程概要總覽】，接著空兩行，再輸出下方的詳細行程介紹。
-        行程必須包含跨縣市交通車程。
+        行程必須包含跨縣市交通車程，並且請務必依照出發時間安排第一天的開始時段與節奏。
+        若出發時間較早，優先安排晨間景點與早發行程；若出發時間較晚，請將行程重心調整為午後與傍晚安排。
 
         選定景點：{spots_context}
         需求：{user_need}

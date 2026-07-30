@@ -393,9 +393,10 @@ export const Dashboard = () => {
     【資管專題動態排程約束律】：
     1. 使用者標記必定要去且已選進清單的景點為：[ ${selectedSpots.join(', ')} ]。在規劃各天行程表時，這些勾選景點「必須 100% 被完整排入」，絕對不准漏掉。
     ${isOffshoreSelected ? `2. 【外島交通約束】：使用者選擇搭乘【${formData.offshore_transit}】前往 ${formData.cities.join(',')}。請在 Day 1 第一站前精準標註本島至外島的交通接駁（如機場報到/碼頭搭船）與預估航程時間。` : ''}
-    3. 使用者勾選了 ${selectedSpots.length} 個景點，預計行程天數為 ${formData.days} 天。若勾選景點數量較多，請在【行程概要總覽】下方特別標註一行警示：「⚠️ 提醒：您選取的景點數量較多，部分景點停留時間將壓縮，請注意行程節奏。」
-    4. 行程路線規劃必須符合地理鄰近性邏輯。嚴禁出現硬接、跨區大幅度來回折返、或前一站跟下一站相隔極遠的極端動線。排程以「同區域、距離近優先」為首要導向。
-    5. 如果使用者勾選的景點數量太少，無法排滿總計 ${formData.days} 天的行程空檔，AI 必須根據當前路線軌跡，主動「穿插推薦 1~2 個完全順路、鄰近的免費熱門小景點或美食」。`;
+    3. 使用者出發時間為【${formData.start_time || '08:00'}】。請依照此時間安排第一天的出發時段、交通接駁與景點順序；若為早發，優先安排晨間景點與較早抵達的行程，若為較晚出發，請將行程重心調整為午後與傍晚安排。
+    4. 使用者勾選了 ${selectedSpots.length} 個景點，預計行程天數為 ${formData.days} 天。若勾選景點數量較多，請在【行程概要總覽】下方特別標註一行警示：「⚠️ 提醒：您選取的景點數量較多，部分景點停留時間將壓縮，請注意行程節奏。」
+    5. 行程路線規劃必須符合地理鄰近性邏輯。嚴禁出現硬接、跨區大幅度來回折返、或前一站跟下一站相隔極遠的極端動線。排程以「同區域、距離近優先」為首要導向。
+    6. 如果使用者勾選的景點數量太少，無法排滿總計 ${formData.days} 天的行程空檔，AI 必須根據當前路線軌跡，主動「穿插推薦 1~2 個完全順路、鄰近的免費熱門小景點或美食」。`;
 
     await handleGenerateFinal(finalSpotsPayload, topologyConstraintPrompt);
   };
@@ -405,12 +406,15 @@ export const Dashboard = () => {
       setLoading(true);
       setErrorMsg("");
 
+      const baseUserNeed = OverrideUserNeed || userNeed || `出發地：${formData.start_location}，預計行程天數：${formData.days}天`;
+      const finalUserNeed = `${baseUserNeed}\n出發時間：${formData.start_time || '08:00'}\n出發地：${formData.start_location}`;
+
       const res = await fetch('https://smart-taiwan.onrender.com/api/v1/generate-final', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accumulated_spots: targetSpots || accumulatedSpots, 
-          user_need: OverrideUserNeed || userNeed || `出發地：${formData.start_location}，預計行程天數：${formData.days}天`, 
+          user_need: finalUserNeed,
           city: formData.cities.join(','),       
           transport: isOffshoreSelected ? `外島(${formData.offshore_transit})+當地${formData.transport}` : formData.transport,
           start_location: formData.start_location, 
@@ -794,6 +798,17 @@ export const Dashboard = () => {
                           placeholder="例如：台北車站、大坪林、二十張路..."
                           className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
                         />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">選擇出發時間</label>
+                        <input
+                          type="time"
+                          value={formData.start_time || '08:00'}
+                          onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                          className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">這個時間會影響行程的出發時段、交通安排與景點節奏。</p>
                       </div>
 
                       <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100 text-center">
