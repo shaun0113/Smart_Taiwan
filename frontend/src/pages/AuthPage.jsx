@@ -16,7 +16,22 @@ export function AuthPage({ onAuthenticated }) {
   const isRegister = mode === 'register';
   const isForgot = mode === 'forgot';
 
+  // 1. 初始化載入 Google Script
   useEffect(() => {
+    if (!document.getElementById('google-client-script')) {
+      const script = document.createElement('script');
+      script.id = 'google-client-script';
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  // 2. 當切換回登入模式時，自動重新渲染 Google 按鈕
+  useEffect(() => {
+    if (mode !== 'login') return;
+
     const handleGoogleResponse = async (response) => {
       try {
         setLoading(true);
@@ -40,31 +55,24 @@ export function AuthPage({ onAuthenticated }) {
       }
     };
 
-    const loadGoogleScript = () => {
-      if (window.google) {
+    const renderGoogleButton = () => {
+      const buttonDiv = document.getElementById('googleButtonDiv');
+      if (window.google && buttonDiv) {
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
           callback: handleGoogleResponse,
         });
         window.google.accounts.id.renderButton(
-          document.getElementById('googleButtonDiv'),
+          buttonDiv,
           { theme: 'outline', size: 'large', width: '100%' }
         );
+      } else {
+        setTimeout(renderGoogleButton, 100);
       }
     };
 
-    if (!document.getElementById('google-client-script')) {
-      const script = document.createElement('script');
-      script.id = 'google-client-script';
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = loadGoogleScript;
-      document.body.appendChild(script);
-    } else {
-      loadGoogleScript();
-    }
-  }, [onAuthenticated]);
+    renderGoogleButton();
+  }, [mode, onAuthenticated]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -74,7 +82,6 @@ export function AuthPage({ onAuthenticated }) {
 
     try {
       if (isForgot) {
-        // 🚀 檢查兩次密碼是否相符
         if (form.password !== form.confirmPassword) {
           setError('兩次輸入的新密碼不相符，請重新確認');
           setLoading(false);
@@ -207,7 +214,6 @@ export function AuthPage({ onAuthenticated }) {
             />
           </div>
 
-          {/* 🚀 忘記密碼時顯示第二次確認密碼輸入框 */}
           {isForgot && (
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">確認新密碼</label>
