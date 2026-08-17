@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 
 const GOOGLE_CLIENT_ID = "255342514400-0lq6v0h1cpj92or171ukfrv14sfhnefi.apps.googleusercontent.com";
 
+// 🚀 自動判斷環境：本地用 8000埠，線上用 Render 雲端後端
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://127.0.0.1:8000'
+  : 'https://smart-taiwan.onrender.com';
+
 export const AuthPage = ({ onLoginSuccess }) => {
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'forgot'
   const [username, setUsername] = useState('');
@@ -16,7 +21,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
       try {
         setLoading(true);
         setErrorMsg('');
-        const res = await fetch('http://127.0.0.1:8000/api/auth/google-login', {
+        const res = await fetch(`${API_BASE_URL}/api/auth/google-login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ credential: response.credential })
@@ -70,7 +75,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
 
     try {
       if (authMode === 'forgot') {
-        const res = await fetch('http://127.0.0.1:8000/api/auth/forgot-password', {
+        const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, new_password: password })
@@ -83,7 +88,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
           setErrorMsg(data.detail || '重設失敗');
         }
       } else {
-        const endpoint = authMode === 'login' ? 'http://127.0.0.1:8000/api/auth/login' : 'http://127.0.0.1:8000/api/auth/register';
+        const endpoint = authMode === 'login' ? `${API_BASE_URL}/api/auth/login` : `${API_BASE_URL}/api/auth/register`;
         const payload = authMode === 'login' ? { email, password } : { username, email, password };
 
         const res = await fetch(endpoint, {
