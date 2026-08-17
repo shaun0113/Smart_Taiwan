@@ -1,6 +1,51 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 
+const THEMES = {
+  emerald: {
+    name: '森林',
+    50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 500: '#10b981', 600: '#059669', 700: '#047857',
+    bgDay: "url('https://images.unsplash.com/photo-1448375240586-882707db888b?q=80&w=2560&auto=format&fit=crop')",
+    bgNight: "linear-gradient(rgba(15, 23, 42, 0.75), rgba(2, 44, 34, 0.95)), url('https://images.unsplash.com/photo-1448375240586-882707db888b?q=80&w=2560&auto=format&fit=crop')"
+  },
+  blue: {
+    name: '大海',
+    50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8',
+    bgDay: "url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=2560&auto=format&fit=crop')",
+    bgNight: "linear-gradient(rgba(15, 23, 42, 0.75), rgba(23, 37, 84, 0.95)), url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=2560&auto=format&fit=crop')"
+  },
+  rose: {
+    name: '櫻花',
+    50: '#fff1f2', 100: '#ffe4e6', 200: '#fecdd3', 500: '#f43f5e', 600: '#e11d48', 700: '#be123c',
+    bgDay: "url('https://images.unsplash.com/photo-1522383225653-ed111181a951?q=80&w=2560&auto=format&fit=crop')",
+    bgNight: "linear-gradient(rgba(15, 23, 42, 0.75), rgba(76, 5, 25, 0.95)), url('https://images.unsplash.com/photo-1522383225653-ed111181a951?q=80&w=2560&auto=format&fit=crop')"
+  },
+  violet: {
+    name: '暗夜',
+    50: '#f5f3ff', 100: '#ede9fe', 200: '#ddd6fe', 500: '#8b5cf6', 600: '#7c3aed', 700: '#6d28d9',
+    bgDay: "url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=2560&auto=format&fit=crop')",
+    bgNight: "linear-gradient(rgba(15, 23, 42, 0.75), rgba(46, 16, 101, 0.95)), url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=2560&auto=format&fit=crop')"
+  },
+  amber: {
+    name: '咖啡',
+    50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 500: '#f59e0b', 600: '#d97706', 700: '#b45309',
+    bgDay: "url('https://images.unsplash.com/photo-1497935586351-b67a49e012bf?q=80&w=2560&auto=format&fit=crop')",
+    bgNight: "linear-gradient(rgba(15, 23, 42, 0.75), rgba(69, 26, 3, 0.95)), url('https://images.unsplash.com/photo-1497935586351-b67a49e012bf?q=80&w=2560&auto=format&fit=crop')"
+  },
+  slate: {
+    name: '城市',
+    50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 500: '#64748b', 600: '#475569', 700: '#334155',
+    bgDay: "url('https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?q=80&w=2560&auto=format&fit=crop')",
+    bgNight: "linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.95)), url('https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?q=80&w=2560&auto=format&fit=crop')"
+  },
+  custom: {
+    name: '自訂 (上傳圖片)',
+    50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 500: '#64748b', 600: '#475569', 700: '#334155',
+    bgDay: "none", 
+    bgNight: "none"
+  }
+};
+
 const TAIWAN_DISTRICTS = {
   "臺北市": ["中正區", "大同區", "中山區", "松山區", "大安區", "萬華區", "信義區", "士林區", "北投區", "內湖區", "南港區", "文山區"],
   "新北市": ["板橋區", "三重區", "中和區", "永和區", "新莊區", "新店區", "樹林區", "汐止區", "土城區", "蘆洲區", "五股區", "泰山區", "林口區", "深坑區", "石碇區", "坪林區", "三芝區", "石門區", "八里區", "淡水區", "萬里區", "金山區", "瑞芳區", "雙溪區", "貢寮區", "平溪區", "烏來區"],
@@ -23,10 +68,9 @@ const TAIWAN_DISTRICTS = {
   "臺東縣": ["臺東市", "成功鎮", "關山鎮", "卑南鄉", "大武鄉", "太麻里鄉", "東河鄉", "長濱鄉", "鹿野鄉", "池上鄉", "綠島鄉", "延平鄉", "海端鄉", "達仁鄉", "金峰鄉", "蘭嶼鄉"]
 };
 
-// 定義外島名單與對應交通點
 const OFFSHORE_ISLANDS = ["澎湖縣", "金門縣", "連江縣", "澎湖", "金門", "馬祖", "綠島", "蘭嶼", "琉球鄉"];
 
-export const Dashboard = () => {
+export const Dashboard = ({ user, onLogout }) => {
   const [formData, setFormData] = useState({
     start_location: '臺北市',
     cities: ['臺北市'],
@@ -34,7 +78,7 @@ export const Dashboard = () => {
     group_size: '2人',
     tags: [],
     transport: '自駕',
-    offshore_transit: '飛機', // 新增：外島交通方式 (飛機 / 輪船)
+    offshore_transit: '飛機',
     start_time: '08:00'
   });
 
@@ -54,19 +98,39 @@ export const Dashboard = () => {
   const [finalItinerary, setFinalItinerary] = useState('');
   
   const [copySuccess, setCopySuccess] = useState(false);
-
-  // 景點過多彈窗鎖
   const [showWarningModal, setShowWarningModal] = useState(false);
-
-  // 地圖即時定位
   const [mapQuery, setMapQuery] = useState('臺北市');
 
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedSpots, setSelectedSpots] = useState([]); 
   const spotsPerPage = 10;
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
+  const [activeTheme, setActiveTheme] = useState('emerald');
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [customBgUrl, setCustomBgUrl] = useState(''); 
+
   const resultEndRef = useRef(null);
   const itineraryRef = useRef(null);
+
+  const isOffshoreSelected = formData.cities.some(c => OFFSHORE_ISLANDS.some(island => c.includes(island)));
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const imageUrl = URL.createObjectURL(file);
+      setCustomBgUrl(imageUrl);
+    }
+  };
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark-mode');
+    } else {
+      document.documentElement.classList.remove('dark-mode');
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -81,24 +145,17 @@ export const Dashboard = () => {
     }
   }, [currentPage, spotsRecommendation]);
 
-  // 組合起點地址並即時更新地圖
   useEffect(() => {
     const combinedAddress = `${selectedCity}${selectedDistrict}${detailRoad}`.trim();
     setFormData(prev => ({ ...prev, start_location: combinedAddress || selectedCity }));
     setMapQuery(combinedAddress || selectedCity);
   }, [selectedCity, selectedDistrict, detailRoad]);
 
-  // 判斷當前目的地是否包含外島
-  const isOffshoreSelected = formData.cities.some(c => OFFSHORE_ISLANDS.some(island => c.includes(island)));
-
-  // 解析器
   const parseSpotsToArray = () => {
     if (!spotsRecommendation) return [];
-    
     const normalizedText = spotsRecommendation.replace(/\r\n/g, '\n');
     const lines = normalizedText.split('\n');
     let parsedSpots = [];
-
     lines.forEach(line => {
       const trimmed = line.trim();
       if (!trimmed) return;
@@ -107,43 +164,28 @@ export const Dashboard = () => {
         const title = parts[1].trim().replace(/[\*#_`📍🐾]/g, '');
         const location = parts.length >= 4 ? parts[2].trim() : title;
         const desc = parts.length >= 4 ? parts[3].trim() : parts[2].trim();
-        
         if (title && title.length >= 2 && title.length < 30) {
-          parsedSpots.push({
-            title: title,
-            rawMarkdown: `📍 **地點**：${location}\n\n💡 ${desc}`
-          });
+          parsedSpots.push({ title: title, rawMarkdown: `📍 **地點**：${location}\n\n💡 ${desc}` });
         }
       }
     });
-
     if (parsedSpots.length >= 3) return parsedSpots.slice(0, 100);
-
     let tempTitle = "";
     let tempDesc = "";
-
     lines.forEach(line => {
       const trimmed = line.trim();
       if (!trimmed) return;
-
       const match = trimmed.match(/^(\d+[\.、\s]|📍|🔸|-|\*)\s*(.+)/) || trimmed.match(/【([^】]+)】/);
       const isNoise = ["推薦理由", "景點", "清單", "規劃師", "指南", "小叮嚀", "注意事項", "Day", "區域"].some(w => trimmed.includes(w) && trimmed.length > 20);
-
       if (match && !isNoise) {
-        if (tempTitle) {
-          parsedSpots.push({ title: tempTitle, rawMarkdown: tempDesc || tempTitle });
-        }
+        if (tempTitle) parsedSpots.push({ title: tempTitle, rawMarkdown: tempDesc || tempTitle });
         tempTitle = (match[2] || match[1]).replace(/[\*#_`\[\]\(\)【】\s📍🐾：:]/g, '').trim();
         tempDesc = "";
       } else if (tempTitle) {
         tempDesc += trimmed + "\n";
       }
     });
-
-    if (tempTitle) {
-      parsedSpots.push({ title: tempTitle, rawMarkdown: tempDesc || tempTitle });
-    }
-
+    if (tempTitle) parsedSpots.push({ title: tempTitle, rawMarkdown: tempDesc || tempTitle });
     return parsedSpots.filter(s => s.title && s.title.length >= 2 && s.title.length < 30).slice(0, 100);
   };
 
@@ -162,7 +204,6 @@ export const Dashboard = () => {
     }
   };
 
-  // 🚀 地圖導航邏輯：外島依「搭船/飛機」導航至本島港口/機場
   const getMapSrc = () => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
@@ -170,25 +211,20 @@ export const Dashboard = () => {
     if (step === 6 && finalItinerary) { 
       const origin = formData.start_location;
 
-      // 如果選的是外島
       if (isOffshoreSelected) {
         let transitDestination = "";
         if (formData.offshore_transit === '飛機') {
-          // 預設導航至台北松山機場 (或依出發地選擇)
           transitDestination = origin.includes('高雄') || origin.includes('屏東') ? '高雄小港國際機場' : '臺北松山機場';
         } else {
-          // 搭船碼頭對應
           if (targetCity.includes('連江') || targetCity.includes('馬祖')) transitDestination = '基隆港西岸旅客碼頭';
           else if (targetCity.includes('澎湖')) transitDestination = '嘉義布袋遊艇港';
           else if (targetCity.includes('琉球')) transitDestination = '屏東東港鹽埔漁港碼頭';
           else if (targetCity.includes('綠島') || targetCity.includes('蘭嶼')) transitDestination = '臺東富岡漁港';
           else transitDestination = '基隆港西岸旅客碼頭';
         }
-
         return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(transitDestination)}&dirflg=${travelMode}&output=embed`;
       }
 
-      // 本島地區正常導航
       const lines = finalItinerary.split('\n');
       let firstSpot = null;
       let inDetailSection = false;
@@ -202,7 +238,6 @@ export const Dashboard = () => {
         if (inDetailSection && line.match(/\d{2}:\d{2}/)) {
           let potentialName = line.replace(/^\d{2}:\d{2}\s*[-─～~]\s*\d{2}:\d{2}/, '').trim();
           potentialName = potentialName.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:~\|]/g, '').trim();
-
           const noiseWords = ['出發', '前往', '車程', '交通', '飯店', '民宿', '抵達', '台北', '臺北', '出發地', '集合', '啟程', '跨縣市', '自駕', '機場', '碼頭', '登機'];
           const isNoise = noiseWords.some(w => potentialName.includes(w));
 
@@ -232,29 +267,14 @@ export const Dashboard = () => {
     const handleGlobalKeyDown = (e) => {
       if (e.key === 'Enter') {
         if (step === 5 || step === 6) return;
-
         e.preventDefault();
-        
-        if (step === 0) { 
-          if (selectedCity) setStep(1); 
-        } 
-        else if (step === 1) { 
-          setStep(2); 
-        } 
-        else if (step === 2) { 
-          // 若選外島進入 step 2.5(外島專用頁)，否則進 step 3
-          setStep(isOffshoreSelected ? 2.5 : 3); 
-        }
-        else if (step === 2.5) {
-          setStep(3);
-        }
-        else if (step === 3) { 
-          setStep(4); 
-        }
+        if (step === 0) { if (selectedCity) setStep(1); } 
+        else if (step === 1) { setStep(2); } 
+        else if (step === 2) { setStep(isOffshoreSelected ? 2.5 : 3); }
+        else if (step === 2.5) { setStep(3); }
+        else if (step === 3) { setStep(4); }
         else if (step === 4) { 
-          if (formData.group_size && formData.group_size.trim() !== '') {
-            handleRecommendSpots(); 
-          }
+          if (formData.group_size && formData.group_size.trim() !== '') handleRecommendSpots(); 
         }
       }
     };
@@ -295,9 +315,7 @@ export const Dashboard = () => {
           accumulated_spots: accumulatedSpots || ""
         })
       });
-
       const data = await res.json();
-
       if (res.ok && data) {
         setUserNeed(data.user_need || `出發地：${formData.start_location}，預計行程天數：${formData.days}天`);
         setSpotsRecommendation(data.spots_recommendation || "");
@@ -335,17 +353,12 @@ export const Dashboard = () => {
           user_need: userNeed
         })
       });
-
       const data = await res.json();
-
       if (res.ok && data) {
         setAccumulatedSpots(data.accumulated_spots);
         setApiMsg(data.msg);
         setUserChoice(""); 
-
-        if (data.status === "READY") {
-          await handleGenerateFinal(data.accumulated_spots);
-        }
+        if (data.status === "READY") await handleGenerateFinal(data.accumulated_spots);
       } else {
         setErrorMsg(`意見微調失敗：${data.detail || JSON.stringify(data)}`);
       }
@@ -393,10 +406,9 @@ export const Dashboard = () => {
     【資管專題動態排程約束律】：
     1. 使用者標記必定要去且已選進清單的景點為：[ ${selectedSpots.join(', ')} ]。在規劃各天行程表時，這些勾選景點「必須 100% 被完整排入」，絕對不准漏掉。
     ${isOffshoreSelected ? `2. 【外島交通約束】：使用者選擇搭乘【${formData.offshore_transit}】前往 ${formData.cities.join(',')}。請在 Day 1 第一站前精準標註本島至外島的交通接駁（如機場報到/碼頭搭船）與預估航程時間。` : ''}
-    3. 使用者出發時間為【${formData.start_time || '08:00'}】。請依照此時間安排第一天的出發時段、交通接駁與景點順序；若為早發，優先安排晨間景點與較早抵達的行程，若為較晚出發，請將行程重心調整為午後與傍晚安排。
-    4. 使用者勾選了 ${selectedSpots.length} 個景點，預計行程天數為 ${formData.days} 天。若勾選景點數量較多，請在【行程概要總覽】下方特別標註一行警示：「⚠️ 提醒：您選取的景點數量較多，部分景點停留時間將壓縮，請注意行程節奏。」
-    5. 行程路線規劃必須符合地理鄰近性邏輯。嚴禁出現硬接、跨區大幅度來回折返、或前一站跟下一站相隔極遠的極端動線。排程以「同區域、距離近優先」為首要導向。
-    6. 如果使用者勾選的景點數量太少，無法排滿總計 ${formData.days} 天的行程空檔，AI 必須根據當前路線軌跡，主動「穿插推薦 1~2 個完全順路、鄰近的免費熱門小景點或美食」。`;
+    3. 使用者勾選了 ${selectedSpots.length} 個景點，預計行程天數為 ${formData.days} 天。若勾選景點數量較多，請在【行程概要總覽】下方特別標註一行警示：「⚠️ 提醒：您選取的景點數量較多，部分景點停留時間將壓縮，請注意行程節奏。」
+    4. 行程路線規劃必須符合地理鄰近性邏輯。嚴禁出現硬接、跨區大幅度來回折返、或前一站跟下一站相隔極遠的極端動線。排程以「同區域、距離近優先」為首要導向。
+    5. 如果使用者勾選的景點數量太少，無法排滿總計 ${formData.days} 天的行程空檔，AI 必須根據當前路線軌跡，主動「穿插推薦 1~2 個完全順路、鄰近的免費熱門小景點或美食」。`;
 
     await handleGenerateFinal(finalSpotsPayload, topologyConstraintPrompt);
   };
@@ -406,15 +418,12 @@ export const Dashboard = () => {
       setLoading(true);
       setErrorMsg("");
 
-      const baseUserNeed = OverrideUserNeed || userNeed || `出發地：${formData.start_location}，預計行程天數：${formData.days}天`;
-      const finalUserNeed = `${baseUserNeed}\n出發時間：${formData.start_time || '08:00'}\n出發地：${formData.start_location}`;
-
       const res = await fetch('https://smart-taiwan.onrender.com/api/v1/generate-final', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accumulated_spots: targetSpots || accumulatedSpots, 
-          user_need: finalUserNeed,
+          user_need: OverrideUserNeed || userNeed || `出發地：${formData.start_location}，預計行程天數：${formData.days}天`, 
           city: formData.cities.join(','),       
           transport: isOffshoreSelected ? `外島(${formData.offshore_transit})+當地${formData.transport}` : formData.transport,
           start_location: formData.start_location, 
@@ -423,7 +432,6 @@ export const Dashboard = () => {
       });
 
       const data = await res.json();
-
       if (res.ok && data && data.result) {
         setFinalItinerary(data.result);
         setStep(6); 
@@ -456,7 +464,6 @@ export const Dashboard = () => {
       });
 
       const data = await res.json();
-
       if (res.ok && data && data.status === "success") {
         setFinalItinerary(data.result);
         setUserChoice(""); 
@@ -474,10 +481,123 @@ export const Dashboard = () => {
   const totalPages = Math.ceil(allParsedSpots.length / spotsPerPage);
   const currentPagedSpots = getPagedSpots();
 
+  const currentThemeData = THEMES[activeTheme];
+  const displayBgDay = activeTheme === 'custom' && customBgUrl ? `url('${customBgUrl}')` : currentThemeData.bgDay;
+  const displayBgNight = activeTheme === 'custom' && customBgUrl ? `linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.95)), url('${customBgUrl}')` : currentThemeData.bgNight;
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 relative">
-      {/* 🚀 列印與 PDF 匯出優化：徹底隱藏地圖區塊與頂部導覽列，消除列印空白頁 */}
       <style>{`
+        :root {
+          --theme-50: ${currentThemeData[50]};
+          --theme-100: ${currentThemeData[100]};
+          --theme-200: ${currentThemeData[200]};
+          --theme-500: ${currentThemeData[500]};
+          --theme-600: ${currentThemeData[600]};
+          --theme-700: ${currentThemeData[700]};
+          --theme-bg-day: ${displayBgDay};
+          --theme-bg-night: ${displayBgNight};
+        }
+
+        html, body, #root, .min-h-screen {
+          background-color: var(--theme-50) !important;
+          background-image: var(--theme-bg-day) !important;
+          background-attachment: fixed !important;
+          background-size: cover !important;
+          background-position: center !important;
+          background-repeat: no-repeat !important;
+        }
+
+        html:not(.dark-mode) .bg-white {
+          background-color: rgba(255, 255, 255, 0.94) !important;
+          backdrop-filter: blur(8px) !important;
+        }
+        
+        .bg-emerald-50 { background-color: var(--theme-50) !important; }
+        .bg-emerald-100 { background-color: var(--theme-100) !important; }
+        .bg-emerald-500 { background-color: var(--theme-500) !important; }
+        .bg-emerald-600 { background-color: var(--theme-600) !important; }
+        .bg-emerald-700 { background-color: var(--theme-700) !important; }
+        .hover\\:bg-emerald-100:hover { background-color: var(--theme-100) !important; }
+        .hover\\:bg-emerald-700:hover { background-color: var(--theme-700) !important; }
+        
+        .text-emerald-600 { color: var(--theme-600) !important; }
+        .text-emerald-700 { color: var(--theme-700) !important; }
+        .hover\\:text-emerald-600:hover { color: var(--theme-600) !important; }
+        .hover\\:text-emerald-700:hover { color: var(--theme-700) !important; }
+        
+        .border-emerald-100 { border-color: var(--theme-100) !important; }
+        .border-emerald-200 { border-color: var(--theme-200) !important; }
+        .border-emerald-500 { border-color: var(--theme-500) !important; }
+        .border-emerald-600 { border-color: var(--theme-600) !important; }
+        .border-emerald-700 { border-color: var(--theme-700) !important; }
+        .hover\\:border-emerald-400:hover { border-color: var(--theme-500) !important; }
+        .focus\\:border-emerald-500:focus { border-color: var(--theme-500) !important; }
+        
+        .accent-emerald-600 { accent-color: var(--theme-600) !important; }
+        .focus\\:ring-emerald-500:focus { --tw-ring-color: var(--theme-500) !important; }
+
+        html.dark-mode {
+          --bg-main: #0f172a;     
+          --bg-card: #1e293b;     
+          --bg-hover: #334155;    
+          --border-light: #1e293b;
+          --border-main: #334155;
+          --border-dark: #475569;
+          --text-900: #f8fafc;    
+          --text-800: #f1f5f9;
+          --text-700: #e2e8f0;
+          --text-600: #cbd5e1;
+          --text-500: #94a3b8;
+          --text-400: #64748b;
+          
+          --theme-50: color-mix(in srgb, var(--theme-500) 15%, var(--bg-main)) !important;
+          --theme-100: color-mix(in srgb, var(--theme-500) 25%, var(--bg-main)) !important;
+          --theme-200: color-mix(in srgb, var(--theme-500) 40%, var(--bg-main)) !important;
+          --theme-700: color-mix(in srgb, var(--theme-500) 20%, #ffffff) !important; 
+          
+          color-scheme: dark; 
+        }
+
+        html.dark-mode, html.dark-mode body, html.dark-mode #root, html.dark-mode .min-h-screen {
+          background-color: var(--bg-main) !important;
+          background-image: var(--theme-bg-night) !important;
+          color: var(--text-800) !important;
+        }
+
+        html.dark-mode .bg-white { 
+          background-color: rgba(30, 41, 59, 0.88) !important; 
+          backdrop-filter: blur(8px) !important;
+        }
+        html.dark-mode .bg-slate-50 { background-color: var(--bg-main) !important; }
+        html.dark-mode .bg-slate-100 { background-color: var(--bg-hover) !important; }
+        html.dark-mode .bg-slate-200 { background-color: var(--border-main) !important; }
+        html.dark-mode .bg-slate-800 { background-color: var(--text-800) !important; color: var(--bg-main) !important; }
+        html.dark-mode .bg-slate-900 { background-color: var(--text-900) !important; color: var(--bg-main) !important; }
+
+        html.dark-mode .hover\\:bg-slate-50:hover { background-color: var(--bg-hover) !important; }
+        html.dark-mode .hover\\:bg-slate-100:hover { background-color: var(--border-main) !important; }
+        html.dark-mode .hover\\:bg-slate-200:hover { background-color: var(--border-dark) !important; }
+        html.dark-mode .hover\\:bg-slate-900:hover { background-color: var(--text-900) !important; }
+
+        html.dark-mode .border-slate-100 { border-color: var(--border-light) !important; }
+        html.dark-mode .border-slate-200 { border-color: var(--border-main) !important; }
+        html.dark-mode .border-slate-300 { border-color: var(--border-dark) !important; }
+        html.dark-mode .border-slate-800 { border-color: var(--text-800) !important; }
+
+        html.dark-mode .text-slate-900 { color: var(--text-900) !important; }
+        html.dark-mode .text-slate-800 { color: var(--text-800) !important; }
+        html.dark-mode .text-slate-700 { color: var(--text-700) !important; }
+        html.dark-mode .text-slate-600 { color: var(--text-600) !important; }
+        html.dark-mode .text-slate-500 { color: var(--text-500) !important; }
+        html.dark-mode .text-slate-400 { color: var(--text-400) !important; }
+        
+        html.dark-mode .bg-slate-900\\/60 { background-color: rgba(15, 23, 42, 0.8) !important; }
+        
+        html.dark-mode .bg-amber-50 { background-color: rgba(69, 26, 3, 0.5) !important; border-color: rgba(120, 53, 15, 0.6) !important; color: #fde68a !important; }
+        html.dark-mode .text-amber-600 { color: #fbbf24 !important; }
+        html.dark-mode .text-amber-800 { color: #fef3c7 !important; }
+
         @media print {
           body, html { background-color: #ffffff !important; color: #000000 !important; }
           header, .mb-6, iframe, h2, .no-print, form, h3, .mt-6, .map-section { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
@@ -487,7 +607,6 @@ export const Dashboard = () => {
         }
       `}</style>
 
-      {/* 景點數量過多攔截 Modal 彈窗 */}
       {showWarningModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-4">
@@ -520,14 +639,136 @@ export const Dashboard = () => {
         </div>
       )}
 
-      <header className="border-b bg-white shadow-sm no-print">
-        <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-800" onClick={() => setStep(0)} style={{ cursor: 'pointer' }}>
+      {/* 🚀 導覽列 */}
+      <header className="border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-sm no-print relative z-40">
+        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
+          
+          <h1 className="text-2xl font-black cursor-pointer m-0 tracking-tight text-slate-800 dark:text-slate-100" onClick={() => setStep(0)}>
             智遊台灣 Smart Tour
           </h1>
-          <span className="text-xs text-slate-500 font-medium">資管系畢業專題 – 國內智慧旅遊決策</span>
+
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="text-right hidden sm:block">
+              <div className="text-xs font-bold text-slate-700 dark:text-slate-200">{user?.username}</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">{user?.email}</div>
+            </div>
+            
+            <button 
+              onClick={() => setIsThemeModalOpen(true)}
+              className="text-xl hover:scale-110 hover:rotate-90 transition-all outline-none grayscale-[0.2]"
+              title="外觀與主題設定"
+            >
+              ⚙️
+            </button>
+
+            {/* 🚀 補回：歷史對話的兩條線按鈕 */}
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex flex-col gap-1.5 justify-center items-center h-10 w-10 outline-none"
+              title="歷史對話"
+            >
+              <span className="block h-[2px] w-5 bg-slate-800 dark:bg-slate-200"></span>
+              <span className="block h-[2px] w-5 bg-slate-800 dark:bg-slate-200"></span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onLogout}
+              className="ml-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              登出
+            </button>
+          </div>
+
         </div>
       </header>
+
+      {/* --- 主題設定與夜間模式 Modal 彈窗 --- */}
+      {isThemeModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4 animate-fadeIn no-print">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border flex flex-col gap-4">
+            <div className="flex justify-between items-center mb-1">
+              <h3 className="text-lg font-extrabold text-slate-900 m-0">⚙️ 外觀與主題設定</h3>
+              <button onClick={() => setIsThemeModalOpen(false)} className="text-slate-400 hover:text-slate-700 text-2xl font-bold leading-none">&times;</button>
+            </div>
+            
+            <div className="mb-2">
+              <label className="block text-xs font-bold text-slate-500 mb-2">🌗 顯示模式</label>
+              <div className="flex gap-2">
+                <button onClick={() => setIsDarkMode(false)} className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${!isDarkMode ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>☀️ 日間</button>
+                <button onClick={() => setIsDarkMode(true)} className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${isDarkMode ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>🌙 夜間</button>
+              </div>
+            </div>
+
+            <div className="h-px w-full bg-slate-100 my-1"></div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-2">🎨 主色調</label>
+              <div className="grid grid-cols-1 gap-2.5">
+                {Object.entries(THEMES).map(([key, theme]) => (
+                  <button
+                    key={key}
+                    onClick={() => setActiveTheme(key)}
+                    className={`p-3 rounded-xl border-2 flex items-center justify-between transition-all ${activeTheme === key ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 hover:border-slate-300 bg-white'}`}
+                  >
+                    <span className={`font-bold text-sm ${activeTheme === key ? 'text-emerald-700' : 'text-slate-700'}`}>{theme.name}</span>
+                    <div className="flex gap-1">
+                      <div className="w-4 h-4 rounded-full shadow-inner" style={{ backgroundColor: theme[200] }}></div>
+                      <div className="w-4 h-4 rounded-full shadow-inner" style={{ backgroundColor: theme[500] }}></div>
+                      <div className="w-4 h-4 rounded-full shadow-inner" style={{ backgroundColor: theme[700] }}></div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              
+              {activeTheme === 'custom' && (
+                 <div className="mt-3 p-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 text-center animate-fadeIn">
+                    <input type="file" id="customBg" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                    <label htmlFor="customBg" className="cursor-pointer text-xs font-bold text-slate-600 hover:text-emerald-600 block w-full py-2">
+                      {customBgUrl ? '✅ 已成功套用自訂背景，點擊重新上傳' : '📸 點擊選擇電腦/手機裡的圖片'}
+                    </label>
+                 </div>
+              )}
+            </div>
+
+            <button onClick={() => setIsThemeModalOpen(false)} className="mt-2 w-full py-3 rounded-xl bg-slate-800 text-white text-sm font-bold hover:bg-slate-900 transition-colors shadow-md">確認套用</button>
+          </div>
+        </div>
+      )}
+
+      {/* --- 右側 Sidebar：歷史紀錄 --- */}
+      <div className={`fixed inset-0 z-50 transition-opacity no-print ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
+        <aside className={`absolute top-0 right-0 w-72 h-full bg-slate-50 dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-800">
+            <span className="font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <span className="text-xl">✨</span> 歷史對話
+            </span>
+            <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 transition-colors">✕</button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-3 space-y-1">
+            <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase px-3 py-2">近期對話 (展示用)</div>
+            {[
+              'Smart Taiwan 專案說明與程式碼',
+              'Vite 專案依賴安裝與執行',
+              'Git 協作程式碼衝突處理',
+              '2K26 82勝 META 陣容組建',
+              'Gem 客製化設定功能說明'
+            ].map((title, i) => (
+              <button key={i} className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors truncate">
+                💬 {title}
+              </button>
+            ))}
+            
+            <div className="mt-6 px-3">
+              <p className="text-xs text-emerald-600 dark:text-emerald-500 font-bold bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/50 leading-relaxed">
+                🚀 資料庫已開通。歷史紀錄保存功能開發中。
+              </p>
+            </div>
+          </div>
+        </aside>
+      </div>
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6">
         <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm no-print">
@@ -544,7 +785,6 @@ export const Dashboard = () => {
 
         {step === 6 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
-            {/* 🚀 地圖區域加上 map-section class，確保 PDF 匯出時 100% 隱藏不留空白 */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 map-section no-print">
               <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（出發地 ➔ 目的地首站/搭乘處）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
@@ -800,17 +1040,6 @@ export const Dashboard = () => {
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1.5">選擇出發時間</label>
-                        <input
-                          type="time"
-                          value={formData.start_time || '08:00'}
-                          onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                          className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
-                        />
-                        <p className="text-[10px] text-slate-400 mt-1">這個時間會影響行程的出發時段、交通安排與景點節奏。</p>
-                      </div>
-
                       <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100 text-center">
                         <span className="text-[11px] text-slate-400 block font-semibold">即時預估出發地：</span>
                         <span className="text-xs font-extrabold text-emerald-700">
@@ -962,7 +1191,7 @@ export const Dashboard = () => {
 
             {step === 5 ? (
               <section className="flex flex-col gap-6 lg:col-span-1 animate-fadeIn lg:sticky lg:top-6 no-print">
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                <div className="bg-white rounded-xl shadow-sm border p-4">
                   <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖智慧導航</h2>
                   <div className="h-[240px] rounded-xl overflow-hidden border border-slate-100">
                     <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Live Map Preview"></iframe>

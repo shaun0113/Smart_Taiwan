@@ -6,6 +6,9 @@ from typing import List, Optional
 from dotenv import load_dotenv
 
 from smart_tour_engine import SmartTourEngine
+from auth_routes import router as auth_router
+from database import init_database
+from profile_routes import router as profile_router
 
 load_dotenv()
 
@@ -20,6 +23,12 @@ app.add_middleware(
 )
 
 engine = SmartTourEngine()
+app.include_router(auth_router)
+app.include_router(profile_router)
+
+@app.on_event("startup")
+def startup_event():
+    init_database()
 
 class RecommendRequest(BaseModel):
     city: str  
