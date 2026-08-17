@@ -70,7 +70,6 @@ const TAIWAN_DISTRICTS = {
 
 const OFFSHORE_ISLANDS = ["澎湖縣", "金門縣", "連江縣", "澎湖", "金門", "馬祖", "綠島", "蘭嶼", "琉球鄉"];
 
-// 防呆機制：過濾不合規時間
 const sanitizeItinerary = (itinerary) => {
   if (!Array.isArray(itinerary)) return [];
   itinerary.forEach(day => {
@@ -842,7 +841,6 @@ export const Dashboard = ({ user, onLogout }) => {
         </div>
       )}
 
-      {/*  導覽列 */}
       <header className="border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-sm no-print relative z-40">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
           
@@ -885,7 +883,6 @@ export const Dashboard = ({ user, onLogout }) => {
         </div>
       </header>
 
-      {/* --- 主題設定與夜間模式 Modal 彈窗 --- */}
       {isThemeModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4 animate-fadeIn no-print">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border flex flex-col gap-4">
@@ -923,7 +920,6 @@ export const Dashboard = ({ user, onLogout }) => {
                 ))}
               </div>
               
-              {/* 自訂圖片 */}
               {activeTheme === 'custom' && (
                  <div className="mt-3 p-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 text-center animate-fadeIn">
                     <input type="file" id="customBg" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -939,7 +935,6 @@ export const Dashboard = ({ user, onLogout }) => {
         </div>
       )}
 
-      {/* --- 右側 Sidebar：更新為圖卡介面渲染 --- */}
       <div className={`fixed inset-0 z-50 transition-opacity no-print ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
         <aside className={`absolute top-0 right-0 w-80 h-full bg-slate-50 dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -972,7 +967,6 @@ export const Dashboard = ({ user, onLogout }) => {
             )}
           </div>
           
-          {/* 清空歷史紀錄按鈕 */}
           {historyList.length > 0 && (
             <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800">
               <button 
@@ -1027,7 +1021,6 @@ export const Dashboard = ({ user, onLogout }) => {
                 <button onClick={handlePrintPDF} className="px-4 py-2 text-xs font-bold rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-all flex items-center gap-1.5 shadow-sm">匯出 PDF / 列印</button>
               </div>
 
-              {/* 拖曳方塊的 UI */}
               <div className="bg-slate-50/70 rounded-xl p-8 border border-slate-100 min-h-[450px]">
                 {loading ? (
                   <div className="h-[350px] flex flex-col items-center justify-center">
@@ -1107,7 +1100,6 @@ export const Dashboard = ({ user, onLogout }) => {
                 )}
               </div>
 
-              {/*  按鈕區與微調區 */}
               <div className="mt-6 border-t border-slate-100 pt-5 no-print flex flex-col md:flex-row justify-between items-end gap-4">
                 <div className="flex-1 w-full">
                   <h3 className="text-sm font-bold text-slate-800 mb-2"> 對行程不滿意？你想修改哪裡：</h3>
@@ -1117,7 +1109,6 @@ export const Dashboard = ({ user, onLogout }) => {
                   </form>
                 </div>
                 
-                {/*  主要儲存按鈕 */}
                 <button 
                   onClick={handleSaveItinerary} 
                   disabled={isSaving || saveSuccess}
@@ -1134,7 +1125,7 @@ export const Dashboard = ({ user, onLogout }) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             
             {step === 5 ? (
-              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[620px] lg:col-span-1 animate-fadeIn">
+              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[620px] animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"> 景點推薦名單</h2>
@@ -1155,13 +1146,13 @@ export const Dashboard = ({ user, onLogout }) => {
                       <div>
                         <p className="font-extrabold text-amber-900 mb-0.5">景點數量偏多提示</p>
                         <p className="leading-relaxed">
-                          預計旅遊天數為 <span className="font-black text-amber-950">{formData.days} 天</span>，已勾選 <span className="font-black text-amber-950">{selectedSpots.length} 個景點</span>。景點過多可能導致拉車交通時間拉長，點擊確定時系統將提供優化建議與確認。
+                          預計旅遊天數為 <span className="font-black text-amber-950">{formData.days} 天</span>，已勾選 <span className="font-black text-amber-950">{selectedSpots.length} 個景點</span>。
                         </p>
                       </div>
                     </div>
                   )}
                   
-                  <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 tracking-wide">
+                  <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 tracking-wide max-h-[420px]">
                     {loading ? (
                       <div className="h-full flex flex-col items-center justify-center py-12">
                         <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div></div>
@@ -1247,7 +1238,6 @@ export const Dashboard = ({ user, onLogout }) => {
               </section>
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
-                {/* 第一步：選擇出發縣市 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="space-y-4 animate-fadeIn">
@@ -1286,7 +1276,6 @@ export const Dashboard = ({ user, onLogout }) => {
                   </div>
                 )}
 
-                {/* 第二步：選擇行政區與詳細路段 */}
                 {step === 1 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="space-y-4 animate-fadeIn">
@@ -1338,7 +1327,6 @@ export const Dashboard = ({ user, onLogout }) => {
                   </div>
                 )}
 
-                {/* 第三步：選擇目的地 */}
                 {step === 2 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
@@ -1364,7 +1352,6 @@ export const Dashboard = ({ user, onLogout }) => {
                   </div>
                 )}
 
-                {/* 外島：選擇跨海交通方式 */}
                 {step === 2.5 && (
                   <div className="flex-1 flex flex-col justify-between animate-fadeIn">
                     <div>
@@ -1409,7 +1396,6 @@ export const Dashboard = ({ user, onLogout }) => {
                   </div>
                 )}
 
-                {/* 第四步：天數與偏好設定 */}
                 {step === 3 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
@@ -1458,7 +1444,6 @@ export const Dashboard = ({ user, onLogout }) => {
                   </div>
                 )}
 
-                {/* 第五步：成員設定 */}
                 {step === 4 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
@@ -1471,6 +1456,14 @@ export const Dashboard = ({ user, onLogout }) => {
                 )}
               </section>
             )}
+
+            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hidden lg:flex flex-col h-[620px] sticky top-6">
+              <h2 className="text-base font-bold text-slate-900 mb-2"> 地點即時預覽</h2>
+              <div className="flex-1 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Preview"></iframe>
+              </div>
+            </section>
+
           </div>
         )}
       </main>

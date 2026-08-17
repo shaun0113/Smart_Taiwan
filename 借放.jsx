@@ -70,6 +70,20 @@ const TAIWAN_DISTRICTS = {
 
 const OFFSHORE_ISLANDS = ["澎湖縣", "金門縣", "連江縣", "澎湖", "金門", "馬祖", "綠島", "蘭嶼", "琉球鄉"];
 
+// 防呆機制：過濾不合規時間
+const sanitizeItinerary = (itinerary) => {
+  if (!Array.isArray(itinerary)) return [];
+  itinerary.forEach(day => {
+    if (Array.isArray(day.spots)) {
+      day.spots.forEach(spot => {
+        const timeMatch = spot.time ? String(spot.time).match(/\d{2}:\d{2}/) : null;
+        spot.time = timeMatch ? timeMatch[0] : "09:00"; 
+      });
+    }
+  });
+  return itinerary;
+};
+
 export const Dashboard = ({ user, onLogout }) => {
   const [formData, setFormData] = useState({
     start_location: '臺北市',
@@ -116,6 +130,11 @@ export const Dashboard = ({ user, onLogout }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [customBgUrl, setCustomBgUrl] = useState(''); 
 
+  const [historyList, setHistoryList] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
   const resultEndRef = useRef(null);
   const itineraryRef = useRef(null);
 
@@ -128,6 +147,31 @@ export const Dashboard = ({ user, onLogout }) => {
       setCustomBgUrl(imageUrl);
     }
   };
+
+  useEffect(() => {
+    if (isSidebarOpen) {
+      const fetchHistory = async () => {
+        setIsLoadingHistory(true);
+        try {
+          const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+          if (!token) return;
+
+          const res = await fetch('http://127.0.0.1:8000/api/v1/itineraries', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (res.ok) {
+            setHistoryList(data);
+          }
+        } catch (e) {
+          console.error("讀取雲端歷史紀錄失敗", e);
+        } finally {
+          setIsLoadingHistory(false);
+        }
+      };
+      fetchHistory();
+    }
+  }, [isSidebarOpen]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -293,7 +337,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setCurrentPage(1);
       setSelectedSpots([]); 
 
-      const res = await fetch('https://smart-taiwan.onrender.com/api/v1/recommend-spots', {
+      const res = await fetch('http://127.0.0.1:8000/api/v1/recommend-spots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -316,7 +360,7 @@ export const Dashboard = ({ user, onLogout }) => {
         setStep(4);
       }
     } catch (error) {
-      setErrorMsg("景點海選連線失敗，請確認 Render 後端雲端服務是否正常啟動。");
+      setErrorMsg("景點海選連線失敗，請確認本地端服務是否正常啟動。");
       setStep(4);
     } finally {
       setLoading(false);
@@ -332,7 +376,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setErrorMsg("");
       setMapQuery(userChoice);
 
-      const res = await fetch('https://smart-taiwan.onrender.com/api/v1/analyze-selection', {
+      const res = await fetch('http://127.0.0.1:8000/api/v1/analyze-selection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -352,7 +396,7 @@ export const Dashboard = ({ user, onLogout }) => {
         setErrorMsg(`意見微調失敗：${data.detail || JSON.stringify(data)}`);
       }
     } catch (error) {
-      setErrorMsg("微調意見發送失敗，請檢查雲端後端連線。");
+      setErrorMsg("微調意見發送失敗，請檢查本地端連線。");
     } finally {
       setLoading(false);
     }
@@ -378,10 +422,83 @@ export const Dashboard = ({ user, onLogout }) => {
   const isOvercrowded = selectedSpots.length > maxRecommendedSpots;
 
   const handleConfirmAndGenerateFinal = () => {
-    if (isOvercrowded) {
-      setShowWarningModal(true);
-    } else {
-      executeGenerateFinal();
+    if (isOvercrowded) setShowWarningModal(true);
+    else executeGenerateFinal();
+  };
+
+  const handleSaveItinerary = async () => {
+    if (itineraryBlocks.length === 0) return;
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      if (!token) {
+        setErrorMsg("請先登入才能儲存行程！");
+        setIsSaving(false);
+        return;
+      }
+
+      const locationName = formData.cities[0] ? formData.cities[0] : '台灣';
+      
+      const payload = {
+        title: `${locationName}${formData.days}日遊`,
+        itinerary_data: itineraryBlocks,
+        form_data: formData
+      };
+
+      const res = await fetch('http://127.0.0.1:8000/api/v1/itineraries', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (res.ok) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        const data = await res.json();
+        setErrorMsg(`儲存失敗: ${data.detail || '未知錯誤'}`);
+      }
+    } catch (e) {
+      console.error("儲存失敗", e);
+      setErrorMsg("連線失敗，請確認後端是否啟動");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadHistory = (item) => {
+    setFormData(item.formData);
+    setItineraryBlocks(item.blocks);
+    setStep(6);
+    setIsSidebarOpen(false); 
+  };
+
+  const handleClearHistory = async () => {
+    if (!window.confirm("確定要刪除所有歷史紀錄嗎？這個動作無法復原喔！")) return;
+    setIsLoadingHistory(true);
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      if (!token) return;
+
+      const res = await fetch('http://127.0.0.1:8000/api/v1/itineraries', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        setHistoryList([]); 
+      } else {
+        const data = await res.json();
+        setErrorMsg(`刪除失敗: ${data.detail || '未知錯誤'}`);
+      }
+    } catch (e) {
+      console.error("刪除歷史紀錄失敗", e);
+      setErrorMsg("連線失敗，請確認後端是否啟動");
+    } finally {
+      setIsLoadingHistory(false);
     }
   };
 
@@ -403,7 +520,7 @@ export const Dashboard = ({ user, onLogout }) => {
     
     【⚠️ 系統輸出格式強制要求】：
     你必須「只」回傳一個合法的 JSON 格式字串，絕對不能包含任何其他說明文字或 Markdown 標記（如 \`\`\`json ）。
-    請嚴格遵守以下 JSON 結構：
+    請嚴格遵守以下 JSON 結構（注意："time" 欄位必須是嚴格的 24 小時制 "HH:MM" 格式，絕對不可包含時間範圍或中文）：
     {
       "itinerary": [
         {
@@ -423,7 +540,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setLoading(true);
       setErrorMsg("");
 
-      const res = await fetch('https://smart-taiwan.onrender.com/api/v1/generate-final', {
+      const res = await fetch('http://127.0.0.1:8000/api/v1/generate-final', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -442,7 +559,10 @@ export const Dashboard = ({ user, onLogout }) => {
           let cleanJson = data.result.replace(/```json/gi, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
           if (parsed.error) throw new Error(parsed.error);
-          setItineraryBlocks(parsed.itinerary || []);
+          
+          const safeItinerary = sanitizeItinerary(parsed.itinerary);
+          
+          setItineraryBlocks(safeItinerary);
           setIsRouteModified(false);
           setStep(6); 
         } catch (e) {
@@ -467,12 +587,12 @@ export const Dashboard = ({ user, onLogout }) => {
       setErrorMsg("");
       setMapQuery(userChoice);
 
-      const res = await fetch('https://smart-taiwan.onrender.com/api/v1/modify-itinerary', {
+      const res = await fetch('http://127.0.0.1:8000/api/v1/modify-itinerary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           current_itinerary: JSON.stringify({ itinerary: itineraryBlocks }),
-          modification_demand: userChoice + "\n【請保持與原本相同的 JSON 結構回傳，不要包含 ```json 等 Markdown 標記】"
+          modification_demand: userChoice + "\n【請保持與原本相同的 JSON 結構回傳，不要包含 ```json 等 Markdown 標記，time 欄位僅限 HH:MM 格式】"
         })
       });
 
@@ -481,7 +601,10 @@ export const Dashboard = ({ user, onLogout }) => {
         try {
           let cleanJson = data.result.replace(/```json/gi, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
-          setItineraryBlocks(parsed.itinerary || []);
+          
+          const safeItinerary = sanitizeItinerary(parsed.itinerary);
+          
+          setItineraryBlocks(safeItinerary);
           setIsRouteModified(true);
           setUserChoice(""); 
         } catch (e) {
@@ -491,7 +614,7 @@ export const Dashboard = ({ user, onLogout }) => {
         setErrorMsg(`微調行程失敗：${data.detail || JSON.stringify(data)}`);
       }
     } catch (error) {
-      setErrorMsg("行程表微調請求失敗，請確認 Render 後端雲端服務是否正常。");
+      setErrorMsg("行程表微調請求失敗，請確認後端連線。");
     } finally {
       setLoading(false);
     }
@@ -706,19 +829,20 @@ export const Dashboard = ({ user, onLogout }) => {
                 onClick={() => setShowWarningModal(false)}
                 className="flex-1 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                 返回修改（刪減景點）
+                 返回修改
               </button>
               <button 
                 onClick={executeGenerateFinal}
                 className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
               >
-                 確定要去，強制排程
+                 確定要去
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/*  導覽列 */}
       <header className="border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-sm no-print relative z-40">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
           
@@ -766,9 +890,10 @@ export const Dashboard = ({ user, onLogout }) => {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4 animate-fadeIn no-print">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border flex flex-col gap-4">
             <div className="flex justify-between items-center mb-1">
-              <h3 className="text-lg font-extrabold text-slate-900 m-0">外觀與主題設定</h3>
+              <h3 className="text-lg font-extrabold text-slate-900 m-0">⚙️ 外觀與主題設定</h3>
               <button onClick={() => setIsThemeModalOpen(false)} className="text-slate-400 hover:text-slate-700 text-2xl font-bold leading-none">&times;</button>
             </div>
+            
             <div className="mb-2">
               <label className="block text-xs font-bold text-slate-500 mb-2"> 顯示模式</label>
               <div className="flex gap-2">
@@ -798,12 +923,12 @@ export const Dashboard = ({ user, onLogout }) => {
                 ))}
               </div>
               
-              {/*  自訂圖片上傳區塊 */}
+              {/* 自訂圖片 */}
               {activeTheme === 'custom' && (
                  <div className="mt-3 p-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 text-center animate-fadeIn">
                     <input type="file" id="customBg" accept="image/*" className="hidden" onChange={handleImageUpload} />
                     <label htmlFor="customBg" className="cursor-pointer text-xs font-bold text-slate-600 hover:text-emerald-600 block w-full py-2">
-                      {customBgUrl ? ' 已成功套用自訂背景，點擊重新上傳' : ' 點擊選擇電腦/手機裡的圖片'}
+                      {customBgUrl ? '✅ 已成功套用自訂背景，點擊重新上傳' : '📸 點擊選擇電腦/手機裡的圖片'}
                     </label>
                  </div>
               )}
@@ -814,33 +939,51 @@ export const Dashboard = ({ user, onLogout }) => {
         </div>
       )}
 
-      {/* --- 右側 Sidebar：歷史紀錄 --- */}
+      {/* --- 右側 Sidebar：更新為圖卡介面渲染 --- */}
       <div className={`fixed inset-0 z-50 transition-opacity no-print ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
-        <aside className={`absolute top-0 right-0 w-72 h-full bg-slate-50 dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <aside className={`absolute top-0 right-0 w-80 h-full bg-slate-50 dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-800">
-            <span className="font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              <span className="text-xl"></span> 歷史對話
+            <span className="font-extrabold text-slate-800 dark:text-slate-800 flex items-center gap-2">
+              <span className="text-xl">歷史紀錄</span> 我的專屬行程簿
             </span>
             <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 transition-colors">✕</button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-3 space-y-1">
-            <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase px-3 py-2">近期對話 (展示用)</div>
-            {[
-              '歷史紀錄保存功能還在用',
-            ].map((title, i) => (
-              <button key={i} className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors truncate">
-                💬 {title}
-              </button>
-            ))}
-            
-            <div className="mt-6 px-3">
-              <p className="text-xs text-emerald-600 dark:text-emerald-500 font-bold bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/50 leading-relaxed">
-                 資料庫已開通。歷史紀錄保存功能開發中。
-              </p>
-            </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {isLoadingHistory ? (
+              <div className="text-center text-xs text-slate-400 mt-10">載入歷史紀錄中...</div>
+            ) : historyList.length === 0 ? (
+              <div className="text-center text-xs text-slate-400 mt-10">尚無儲存的行程紀錄。</div>
+            ) : (
+              historyList.map((item, i) => (
+                <div key={item.id || i} onClick={() => loadHistory(item)} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="text-sm font-black text-emerald-700 dark:text-emerald-500 truncate pr-2">{item.title}</h4>
+                    <span className="text-[10px] text-slate-400 whitespace-nowrap">{item.created_at}</span>
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <button className="flex-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[11px] font-bold rounded-lg transition-colors pointer-events-none">
+                      載入行程
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
+          
+          {/* 清空歷史紀錄按鈕 */}
+          {historyList.length > 0 && (
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800">
+              <button 
+                onClick={handleClearHistory}
+                disabled={isLoadingHistory}
+                className="w-full py-2.5 rounded-xl border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-xs font-bold transition-colors flex items-center justify-center gap-2"
+              >
+                 清除所有歷史紀錄
+              </button>
+            </div>
+          )}
         </aside>
       </div>
 
@@ -860,7 +1003,7 @@ export const Dashboard = ({ user, onLogout }) => {
         {step === 6 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 map-section no-print">
-              <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（出發地 ➔ 目的地首站/搭乘處）</h2>
+              <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（點擊更多選項可以看第一天所有行程導航圖）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Navigation"></iframe>
               </div>
@@ -884,7 +1027,7 @@ export const Dashboard = ({ user, onLogout }) => {
                 <button onClick={handlePrintPDF} className="px-4 py-2 text-xs font-bold rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-all flex items-center gap-1.5 shadow-sm">匯出 PDF / 列印</button>
               </div>
 
-              {/* 🚀 Scratch 拖曳方塊的 UI */}
+              {/* 拖曳方塊的 UI */}
               <div className="bg-slate-50/70 rounded-xl p-8 border border-slate-100 min-h-[450px]">
                 {loading ? (
                   <div className="h-[350px] flex flex-col items-center justify-center">
@@ -964,12 +1107,26 @@ export const Dashboard = ({ user, onLogout }) => {
                 )}
               </div>
 
-              <div className="mt-6 border-t border-slate-100 pt-5 no-print">
-                <h3 className="text-sm font-bold text-slate-800 mb-2"> 對行程不滿意？你想修改哪裡：</h3>
-                <form onSubmit={handleModifyItinerary} className="flex gap-2">
-                  <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder={loading ? "正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排鬆一點..."} className="flex-1 text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
-                  <button type="submit" disabled={loading || !userChoice.trim()} className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 shadow-md shadow-emerald-600/10 transition-all">{loading ? "修改中..." : "送出修改需求"}</button>
-                </form>
+              {/*  按鈕區與微調區 */}
+              <div className="mt-6 border-t border-slate-100 pt-5 no-print flex flex-col md:flex-row justify-between items-end gap-4">
+                <div className="flex-1 w-full">
+                  <h3 className="text-sm font-bold text-slate-800 mb-2"> 對行程不滿意？你想修改哪裡：</h3>
+                  <form onSubmit={handleModifyItinerary} className="flex gap-2">
+                    <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder={loading ? "正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排鬆一點..."} className="flex-1 text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
+                    <button type="submit" disabled={loading || !userChoice.trim()} className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 shadow-md shadow-emerald-600/10 transition-all">{loading ? "修改中..." : "送出修改需求"}</button>
+                  </form>
+                </div>
+                
+                {/*  主要儲存按鈕 */}
+                <button 
+                  onClick={handleSaveItinerary} 
+                  disabled={isSaving || saveSuccess}
+                  className={`px-6 py-3 w-full md:w-auto rounded-xl text-sm font-bold transition-all shadow-md flex items-center justify-center gap-2 ${
+                    saveSuccess ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-slate-800 text-white hover:bg-slate-900"
+                  }`}
+                >
+                  {isSaving ? "儲存中..." : saveSuccess ? " 行程已儲存" : " 儲存行程至紀錄"}
+                </button>
               </div>
             </div>
           </div>
@@ -1090,7 +1247,7 @@ export const Dashboard = ({ user, onLogout }) => {
               </section>
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
-                {/* 第一步：僅選擇出發縣市 */}
+                {/* 第一步：選擇出發縣市 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="space-y-4 animate-fadeIn">
@@ -1207,7 +1364,7 @@ export const Dashboard = ({ user, onLogout }) => {
                   </div>
                 )}
 
-                {/* 🚀 外島專用加頁：選擇跨海交通方式 */}
+                {/* 外島：選擇跨海交通方式 */}
                 {step === 2.5 && (
                   <div className="flex-1 flex flex-col justify-between animate-fadeIn">
                     <div>
@@ -1314,63 +1471,6 @@ export const Dashboard = ({ user, onLogout }) => {
                 )}
               </section>
             )}
-
-            {step === 5 ? (
-              <section className="flex flex-col gap-6 lg:col-span-1 animate-fadeIn lg:sticky lg:top-6 no-print">
-                <div className="bg-white rounded-xl shadow-sm border p-4">
-                  <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖智慧導航</h2>
-                  <div className="h-[240px] rounded-xl overflow-hidden border border-slate-100">
-                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Live Map Preview"></iframe>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col gap-4">
-                  <div>
-                    <h2 className="text-base font-bold text-slate-900 mb-1">偏好意見調整</h2>
-                    <p className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100/70">{apiMsg || "請檢閱左側 AI 智慧決策建議名單。"}</p>
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    <form onSubmit={handleAnalyzeSelection} className="flex gap-2">
-                      <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="例如：某些景點不要去、加入特定新景點..." className="flex-1 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
-                      <button type="submit" disabled={loading || !userChoice.trim()} className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 transition-colors">送出意見</button>
-                    </form>
-
-                    {accumulatedSpots && accumulatedSpots.trim() !== "" && (
-                      <div className="mt-1">
-                        <span className="block text-[11px] font-semibold text-slate-400 mb-1.5">已提交的變更需求紀錄：</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {accumulatedSpots.split('+').map((opinion, idx) => {
-                            const cleanOpinion = opinion.trim();
-                            if (!cleanOpinion) return null;
-                            return <span key={idx} className="inline-flex items-center bg-slate-50 text-slate-600 text-[11px] px-2.5 py-1 rounded-lg border border-slate-200/60 shadow-2xs font-medium">🎯 {cleanOpinion}</span>;
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
-            ) : (
-              <section className="flex flex-col gap-4 no-print">
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5 flex-1 flex flex-col">
-                  <h2 className="text-base font-bold text-slate-900 mb-1">區域地圖智慧導航（動態路線預覽）</h2>
-                  <div className="mt-2 h-[460px] rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Initial Map Preview"></iframe>
-                  </div>
-                </div>
-
-                {step > 1 && (
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5 flex-1 flex flex-col animate-fadeIn">
-                    <h2 className="text-base font-bold text-slate-900 mb-2">智慧旅遊決策建議</h2>
-                    <div className="flex-1 bg-slate-50/70 rounded-xl p-4 border border-slate-100 min-h-[260px] max-h-[360px] overflow-y-auto text-sm text-slate-700 flex items-center justify-center">
-                      <p className="text-slate-400 text-xs text-center italic">尚未產生建議，請先在左側面板完成偏好設定。</p>
-                    </div>
-                  </div>
-                )}
-              </section>
-            )}
-
           </div>
         )}
       </main>
