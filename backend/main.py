@@ -45,7 +45,6 @@ class AnalyzeRequest(BaseModel):
     accumulated_spots: str
     user_need: str
 
-# --- 7/9 新增可以設定出發地 ---
 class FinalItineraryRequest(BaseModel):
     accumulated_spots: str
     user_need: str
@@ -54,11 +53,9 @@ class FinalItineraryRequest(BaseModel):
     start_location: str = "臺北市" 
     start_time: str = "08:00"     
 
-# --- 7/3 新增的微調修改 ---
 class ModifyItineraryRequest(BaseModel):
     current_itinerary: str
     modification_demand: str
-# -------------------------
 
 class ItineraryCreate(BaseModel):
     title: str
@@ -115,7 +112,6 @@ async def generate_final(req: FinalItineraryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"生成最終行程表異常: {str(e)}")
 
-# --- 7/3 新增的微調修改 ---
 @app.post("/api/v1/modify-itinerary")
 def api_modify_itinerary(req: ModifyItineraryRequest):
     try:
@@ -129,8 +125,7 @@ def api_modify_itinerary(req: ModifyItineraryRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"修改行程異常: {str(e)}")
-# -------------------------
-# 🚀 1. 儲存行程至資料庫
+
 @app.post("/api/v1/itineraries")
 def save_itinerary(itinerary: ItineraryCreate, current_user: dict = Depends(get_current_user)):
     with get_auth_db() as db:
@@ -149,14 +144,14 @@ def save_itinerary(itinerary: ItineraryCreate, current_user: dict = Depends(get_
             )
     return {"status": "success", "msg": "行程已儲存至雲端"}
 
-# 🚀 2. 讀取使用者的歷史行程
 @app.get("/api/v1/itineraries")
 def get_user_itineraries(current_user: dict = Depends(get_current_user)):
     with get_auth_db() as db:
         with db.cursor() as cursor:
+            # 🚀 修復關鍵：把 % 替換成 %%，避免 pymysql 誤判
             cursor.execute(
                 """
-                SELECT id, title, itinerary_data, form_data, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i') as created_at 
+                SELECT id, title, itinerary_data, form_data, DATE_FORMAT(created_at, '%%Y-%%m-%%d %%H:%%i') as created_at 
                 FROM itineraries 
                 WHERE user_id = %s 
                 ORDER BY created_at DESC 
@@ -168,7 +163,6 @@ def get_user_itineraries(current_user: dict = Depends(get_current_user)):
             
             result = []
             for r in records:
-                # 確保 JSON 格式正確解析
                 blocks = json.loads(r['itinerary_data']) if isinstance(r['itinerary_data'], str) else r['itinerary_data']
                 form_data = json.loads(r['form_data']) if isinstance(r['form_data'], str) else r['form_data']
                 
