@@ -476,7 +476,6 @@ export const Dashboard = ({ user, onLogout }) => {
     setIsSidebarOpen(false); 
   };
 
-  // 🚀 新增：負責呼叫清除紀錄 API 的函式
   const handleClearHistory = async () => {
     if (!window.confirm("確定要刪除所有歷史紀錄嗎？這個動作無法復原喔！")) return;
     setIsLoadingHistory(true);
@@ -490,7 +489,7 @@ export const Dashboard = ({ user, onLogout }) => {
       });
       
       if (res.ok) {
-        setHistoryList([]); // 直接清空前端畫面
+        setHistoryList([]); 
       } else {
         const data = await res.json();
         setErrorMsg(`刪除失敗: ${data.detail || '未知錯誤'}`);
@@ -830,20 +829,20 @@ export const Dashboard = ({ user, onLogout }) => {
                 onClick={() => setShowWarningModal(false)}
                 className="flex-1 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                ↩️ 返回修改（刪減景點）
+                 返回修改
               </button>
               <button 
                 onClick={executeGenerateFinal}
                 className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
               >
-                ⚡ 確定要去，強行排程
+                 確定要去
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 🚀 導覽列 */}
+      {/*  導覽列 */}
       <header className="border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-sm no-print relative z-40">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
           
@@ -896,7 +895,7 @@ export const Dashboard = ({ user, onLogout }) => {
             </div>
             
             <div className="mb-2">
-              <label className="block text-xs font-bold text-slate-500 mb-2">🌗 顯示模式</label>
+              <label className="block text-xs font-bold text-slate-500 mb-2"> 顯示模式</label>
               <div className="flex gap-2">
                 <button onClick={() => setIsDarkMode(false)} className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${!isDarkMode ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>☀️ 日間</button>
                 <button onClick={() => setIsDarkMode(true)} className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${isDarkMode ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>🌙 夜間</button>
@@ -906,7 +905,7 @@ export const Dashboard = ({ user, onLogout }) => {
             <div className="h-px w-full bg-slate-100 my-1"></div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-2">🎨 主色調</label>
+              <label className="block text-xs font-bold text-slate-500 mb-2"> 主色調</label>
               <div className="grid grid-cols-1 gap-2.5">
                 {Object.entries(THEMES).map(([key, theme]) => (
                   <button
@@ -924,7 +923,7 @@ export const Dashboard = ({ user, onLogout }) => {
                 ))}
               </div>
               
-              {/* 🚀 自訂圖片上傳區塊 */}
+              {/* 自訂圖片 */}
               {activeTheme === 'custom' && (
                  <div className="mt-3 p-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 text-center animate-fadeIn">
                     <input type="file" id="customBg" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -940,7 +939,7 @@ export const Dashboard = ({ user, onLogout }) => {
         </div>
       )}
 
-      {/* --- 🚀 右側 Sidebar：更新為圖卡介面渲染 --- */}
+      {/* --- 右側 Sidebar：更新為圖卡介面渲染 --- */}
       <div className={`fixed inset-0 z-50 transition-opacity no-print ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
         <aside className={`absolute top-0 right-0 w-80 h-full bg-slate-50 dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -973,7 +972,7 @@ export const Dashboard = ({ user, onLogout }) => {
             )}
           </div>
           
-          {/* 🚀 新增：清空歷史紀錄按鈕 (只有當有紀錄時才顯示) */}
+          {/* 清空歷史紀錄按鈕 */}
           {historyList.length > 0 && (
             <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800">
               <button 
@@ -981,7 +980,7 @@ export const Dashboard = ({ user, onLogout }) => {
                 disabled={isLoadingHistory}
                 className="w-full py-2.5 rounded-xl border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-xs font-bold transition-colors flex items-center justify-center gap-2"
               >
-                🗑️ 清除所有歷史紀錄
+                 清除所有歷史紀錄
               </button>
             </div>
           )}
@@ -1028,7 +1027,7 @@ export const Dashboard = ({ user, onLogout }) => {
                 <button onClick={handlePrintPDF} className="px-4 py-2 text-xs font-bold rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-all flex items-center gap-1.5 shadow-sm">匯出 PDF / 列印</button>
               </div>
 
-              {/* 🚀 Scratch 拖曳方塊的 UI */}
+              {/* 拖曳方塊的 UI */}
               <div className="bg-slate-50/70 rounded-xl p-8 border border-slate-100 min-h-[450px]">
                 {loading ? (
                   <div className="h-[350px] flex flex-col items-center justify-center">
@@ -1108,7 +1107,7 @@ export const Dashboard = ({ user, onLogout }) => {
                 )}
               </div>
 
-              {/* 🚀 最終按鈕區與微調區 */}
+              {/*  按鈕區與微調區 */}
               <div className="mt-6 border-t border-slate-100 pt-5 no-print flex flex-col md:flex-row justify-between items-end gap-4">
                 <div className="flex-1 w-full">
                   <h3 className="text-sm font-bold text-slate-800 mb-2"> 對行程不滿意？你想修改哪裡：</h3>
@@ -1118,7 +1117,7 @@ export const Dashboard = ({ user, onLogout }) => {
                   </form>
                 </div>
                 
-                {/* 🚀 主要儲存按鈕（在頁面最右下角） */}
+                {/*  主要儲存按鈕 */}
                 <button 
                   onClick={handleSaveItinerary} 
                   disabled={isSaving || saveSuccess}
@@ -1126,7 +1125,7 @@ export const Dashboard = ({ user, onLogout }) => {
                     saveSuccess ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-slate-800 text-white hover:bg-slate-900"
                   }`}
                 >
-                  {isSaving ? "儲存中..." : saveSuccess ? "✅ 行程已儲存" : "💾 儲存行程至紀錄"}
+                  {isSaving ? "儲存中..." : saveSuccess ? " 行程已儲存" : " 儲存行程至紀錄"}
                 </button>
               </div>
             </div>
@@ -1248,7 +1247,7 @@ export const Dashboard = ({ user, onLogout }) => {
               </section>
             ) : (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
-                {/* 第一步：僅選擇出發縣市 */}
+                {/* 第一步：選擇出發縣市 */}
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="space-y-4 animate-fadeIn">
@@ -1365,7 +1364,7 @@ export const Dashboard = ({ user, onLogout }) => {
                   </div>
                 )}
 
-                {/* 🚀 外島專用加頁：選擇跨海交通方式 */}
+                {/* 外島：選擇跨海交通方式 */}
                 {step === 2.5 && (
                   <div className="flex-1 flex flex-col justify-between animate-fadeIn">
                     <div>
