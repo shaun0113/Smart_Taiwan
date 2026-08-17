@@ -143,15 +143,14 @@ def save_itinerary(itinerary: ItineraryCreate, current_user: dict = Depends(get_
                 )
             )
     return {"status": "success", "msg": "行程已儲存至雲端"}
-
 @app.get("/api/v1/itineraries")
 def get_user_itineraries(current_user: dict = Depends(get_current_user)):
     with get_auth_db() as db:
         with db.cursor() as cursor:
-            # 🚀 修復關鍵：把 % 替換成 %%，避免 pymysql 誤判
             cursor.execute(
                 """
-                SELECT id, title, itinerary_data, form_data, DATE_FORMAT(created_at, '%%Y-%%m-%%d %%H:%%i') as created_at 
+                SELECT id, title, itinerary_data, form_data, 
+                       DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%%Y-%%m-%%d %%H:%%i') as created_at 
                 FROM itineraries 
                 WHERE user_id = %s 
                 ORDER BY created_at DESC 
@@ -174,3 +173,13 @@ def get_user_itineraries(current_user: dict = Depends(get_current_user)):
                     "created_at": r['created_at']
                 })
             return result
+        
+@app.delete("/api/v1/itineraries")
+def clear_user_itineraries(current_user: dict = Depends(get_current_user)):
+    with get_auth_db() as db:
+        with db.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM itineraries WHERE user_id = %s",
+                (current_user['id'],)
+            )
+    return {"status": "success", "msg": "歷史紀錄已全數清除"}

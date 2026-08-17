@@ -70,13 +70,12 @@ const TAIWAN_DISTRICTS = {
 
 const OFFSHORE_ISLANDS = ["澎湖縣", "金門縣", "連江縣", "澎湖", "金門", "馬祖", "綠島", "蘭嶼", "琉球鄉"];
 
-// 🚀 強制清理時間格式的防呆函式
+// 防呆機制：過濾不合規時間
 const sanitizeItinerary = (itinerary) => {
   if (!Array.isArray(itinerary)) return [];
   itinerary.forEach(day => {
     if (Array.isArray(day.spots)) {
       day.spots.forEach(spot => {
-        // 使用 Regex 抓取字串中第一組 HH:MM
         const timeMatch = spot.time ? String(spot.time).match(/\d{2}:\d{2}/) : null;
         spot.time = timeMatch ? timeMatch[0] : "09:00"; 
       });
@@ -477,6 +476,33 @@ export const Dashboard = ({ user, onLogout }) => {
     setIsSidebarOpen(false); 
   };
 
+  // 🚀 新增：負責呼叫清除紀錄 API 的函式
+  const handleClearHistory = async () => {
+    if (!window.confirm("確定要刪除所有歷史紀錄嗎？這個動作無法復原喔！")) return;
+    setIsLoadingHistory(true);
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      if (!token) return;
+
+      const res = await fetch('http://127.0.0.1:8000/api/v1/itineraries', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        setHistoryList([]); // 直接清空前端畫面
+      } else {
+        const data = await res.json();
+        setErrorMsg(`刪除失敗: ${data.detail || '未知錯誤'}`);
+      }
+    } catch (e) {
+      console.error("刪除歷史紀錄失敗", e);
+      setErrorMsg("連線失敗，請確認後端是否啟動");
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
   const executeGenerateFinal = async () => {
     setShowWarningModal(false);
     let finalSpotsPayload = accumulatedSpots;
@@ -535,7 +561,6 @@ export const Dashboard = ({ user, onLogout }) => {
           const parsed = JSON.parse(cleanJson);
           if (parsed.error) throw new Error(parsed.error);
           
-          // 🚀 防呆機制：過濾 AI 亂寫的非標準時間格式
           const safeItinerary = sanitizeItinerary(parsed.itinerary);
           
           setItineraryBlocks(safeItinerary);
@@ -578,7 +603,6 @@ export const Dashboard = ({ user, onLogout }) => {
           let cleanJson = data.result.replace(/```json/gi, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
           
-          // 🚀 防呆機制：過濾微調時產生的不合法時間格式
           const safeItinerary = sanitizeItinerary(parsed.itinerary);
           
           setItineraryBlocks(safeItinerary);
@@ -806,7 +830,7 @@ export const Dashboard = ({ user, onLogout }) => {
                 onClick={() => setShowWarningModal(false)}
                 className="flex-1 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                 返回修改（刪減景點）
+                ↩️ 返回修改（刪減景點）
               </button>
               <button 
                 onClick={executeGenerateFinal}
@@ -819,7 +843,7 @@ export const Dashboard = ({ user, onLogout }) => {
         </div>
       )}
 
-      {/*  導覽列 */}
+      {/* 🚀 導覽列 */}
       <header className="border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-sm no-print relative z-40">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
           
@@ -867,12 +891,12 @@ export const Dashboard = ({ user, onLogout }) => {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4 animate-fadeIn no-print">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border flex flex-col gap-4">
             <div className="flex justify-between items-center mb-1">
-              <h3 className="text-lg font-extrabold text-slate-900 m-0"> 外觀與主題設定</h3>
+              <h3 className="text-lg font-extrabold text-slate-900 m-0">⚙️ 外觀與主題設定</h3>
               <button onClick={() => setIsThemeModalOpen(false)} className="text-slate-400 hover:text-slate-700 text-2xl font-bold leading-none">&times;</button>
             </div>
             
             <div className="mb-2">
-              <label className="block text-xs font-bold text-slate-500 mb-2"> 顯示模式</label>
+              <label className="block text-xs font-bold text-slate-500 mb-2">🌗 顯示模式</label>
               <div className="flex gap-2">
                 <button onClick={() => setIsDarkMode(false)} className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${!isDarkMode ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>☀️ 日間</button>
                 <button onClick={() => setIsDarkMode(true)} className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${isDarkMode ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>🌙 夜間</button>
@@ -882,7 +906,7 @@ export const Dashboard = ({ user, onLogout }) => {
             <div className="h-px w-full bg-slate-100 my-1"></div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-2"> 主色調</label>
+              <label className="block text-xs font-bold text-slate-500 mb-2">🎨 主色調</label>
               <div className="grid grid-cols-1 gap-2.5">
                 {Object.entries(THEMES).map(([key, theme]) => (
                   <button
@@ -900,12 +924,12 @@ export const Dashboard = ({ user, onLogout }) => {
                 ))}
               </div>
               
-              {/*  自訂圖片上傳區塊 */}
+              {/* 🚀 自訂圖片上傳區塊 */}
               {activeTheme === 'custom' && (
                  <div className="mt-3 p-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 text-center animate-fadeIn">
                     <input type="file" id="customBg" accept="image/*" className="hidden" onChange={handleImageUpload} />
                     <label htmlFor="customBg" className="cursor-pointer text-xs font-bold text-slate-600 hover:text-emerald-600 block w-full py-2">
-                      {customBgUrl ? ' 已成功套用自訂背景，點擊重新上傳' : '📸 點擊選擇電腦/手機裡的圖片'}
+                      {customBgUrl ? '✅ 已成功套用自訂背景，點擊重新上傳' : '📸 點擊選擇電腦/手機裡的圖片'}
                     </label>
                  </div>
               )}
@@ -916,13 +940,13 @@ export const Dashboard = ({ user, onLogout }) => {
         </div>
       )}
 
-      {/* ---  右側 Sidebar：更新為圖卡介面渲染 --- */}
+      {/* --- 🚀 右側 Sidebar：更新為圖卡介面渲染 --- */}
       <div className={`fixed inset-0 z-50 transition-opacity no-print ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
         <aside className={`absolute top-0 right-0 w-80 h-full bg-slate-50 dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-800">
             <span className="font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              <span className="text-xl"></span> 我的專屬行程簿
+              <span className="text-xl">✨</span> 我的專屬行程簿
             </span>
             <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 transition-colors">✕</button>
           </div>
@@ -948,6 +972,19 @@ export const Dashboard = ({ user, onLogout }) => {
               ))
             )}
           </div>
+          
+          {/* 🚀 新增：清空歷史紀錄按鈕 (只有當有紀錄時才顯示) */}
+          {historyList.length > 0 && (
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800">
+              <button 
+                onClick={handleClearHistory}
+                disabled={isLoadingHistory}
+                className="w-full py-2.5 rounded-xl border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-xs font-bold transition-colors flex items-center justify-center gap-2"
+              >
+                🗑️ 清除所有歷史紀錄
+              </button>
+            </div>
+          )}
         </aside>
       </div>
 
@@ -991,7 +1028,7 @@ export const Dashboard = ({ user, onLogout }) => {
                 <button onClick={handlePrintPDF} className="px-4 py-2 text-xs font-bold rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-all flex items-center gap-1.5 shadow-sm">匯出 PDF / 列印</button>
               </div>
 
-              {/*  Scratch 拖曳方塊的 UI */}
+              {/* 🚀 Scratch 拖曳方塊的 UI */}
               <div className="bg-slate-50/70 rounded-xl p-8 border border-slate-100 min-h-[450px]">
                 {loading ? (
                   <div className="h-[350px] flex flex-col items-center justify-center">
@@ -1089,7 +1126,7 @@ export const Dashboard = ({ user, onLogout }) => {
                     saveSuccess ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-slate-800 text-white hover:bg-slate-900"
                   }`}
                 >
-                  {isSaving ? "儲存中..." : saveSuccess ? "行程已儲存" : " 儲存行程至紀錄"}
+                  {isSaving ? "儲存中..." : saveSuccess ? "✅ 行程已儲存" : "💾 儲存行程至紀錄"}
                 </button>
               </div>
             </div>
@@ -1359,7 +1396,7 @@ export const Dashboard = ({ user, onLogout }) => {
                               : 'border-slate-200 bg-slate-50 hover:bg-slate-100/80'
                           }`}
                         >
-                          <span className="text-4xl"></span>
+                          <span className="text-4xl">🚢</span>
                           <span className="text-sm font-extrabold text-slate-800">搭乘輪船</span>
                           <span className="text-[11px] text-slate-500 text-center">悠閒渡輪，導航將自動引導至出海港口碼頭</span>
                         </div>
@@ -1435,63 +1472,6 @@ export const Dashboard = ({ user, onLogout }) => {
                 )}
               </section>
             )}
-
-            {step === 5 ? (
-              <section className="flex flex-col gap-6 lg:col-span-1 animate-fadeIn lg:sticky lg:top-6 no-print">
-                <div className="bg-white rounded-xl shadow-sm border p-4">
-                  <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖智慧導航</h2>
-                  <div className="h-[240px] rounded-xl overflow-hidden border border-slate-100">
-                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Live Map Preview"></iframe>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col gap-4">
-                  <div>
-                    <h2 className="text-base font-bold text-slate-900 mb-1">偏好意見調整</h2>
-                    <p className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100/70">{apiMsg || "請檢閱左側 AI 智慧決策建議名單。"}</p>
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    <form onSubmit={handleAnalyzeSelection} className="flex gap-2">
-                      <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="例如：某些景點不要去、加入特定新景點..." className="flex-1 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
-                      <button type="submit" disabled={loading || !userChoice.trim()} className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 transition-colors">送出意見</button>
-                    </form>
-
-                    {accumulatedSpots && accumulatedSpots.trim() !== "" && (
-                      <div className="mt-1">
-                        <span className="block text-[11px] font-semibold text-slate-400 mb-1.5">已提交的變更需求紀錄：</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {accumulatedSpots.split('+').map((opinion, idx) => {
-                            const cleanOpinion = opinion.trim();
-                            if (!cleanOpinion) return null;
-                            return <span key={idx} className="inline-flex items-center bg-slate-50 text-slate-600 text-[11px] px-2.5 py-1 rounded-lg border border-slate-200/60 shadow-2xs font-medium">🎯 {cleanOpinion}</span>;
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
-            ) : (
-              <section className="flex flex-col gap-4 no-print">
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5 flex-1 flex flex-col">
-                  <h2 className="text-base font-bold text-slate-900 mb-1">區域地圖智慧導航（動態路線預覽）</h2>
-                  <div className="mt-2 h-[460px] rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Initial Map Preview"></iframe>
-                  </div>
-                </div>
-
-                {step > 1 && (
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5 flex-1 flex flex-col animate-fadeIn">
-                    <h2 className="text-base font-bold text-slate-900 mb-2">智慧旅遊決策建議</h2>
-                    <div className="flex-1 bg-slate-50/70 rounded-xl p-4 border border-slate-100 min-h-[260px] max-h-[360px] overflow-y-auto text-sm text-slate-700 flex items-center justify-center">
-                      <p className="text-slate-400 text-xs text-center italic">尚未產生建議，請先在左側面板完成偏好設定。</p>
-                    </div>
-                  </div>
-                )}
-              </section>
-            )}
-
           </div>
         )}
       </main>
