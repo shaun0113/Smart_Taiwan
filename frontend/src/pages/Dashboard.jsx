@@ -1122,10 +1122,10 @@ export const Dashboard = ({ user, onLogout }) => {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
             
             {step === 5 ? (
-              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[620px] animate-fadeIn">
+              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[750px] animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"> 景點推薦名單</h2>
@@ -1152,7 +1152,7 @@ export const Dashboard = ({ user, onLogout }) => {
                     </div>
                   )}
                   
-                  <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 tracking-wide max-h-[420px]">
+                  <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 tracking-wide max-h-[520px]">
                     {loading ? (
                       <div className="h-full flex flex-col items-center justify-center py-12">
                         <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div></div>
@@ -1237,14 +1237,14 @@ export const Dashboard = ({ user, onLogout }) => {
                 </div>
               </section>
             ) : (
-              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
+              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[750px]">
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="space-y-4 animate-fadeIn">
                       <h2 className="text-base font-bold text-slate-900 mb-1">第一步：你的出發地在哪裡？</h2>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2">選擇出發縣市</label>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[320px] pr-1">
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[380px] pr-1">
                           {Object.keys(TAIWAN_DISTRICTS).map(city => {
                             const isSelected = selectedCity === city;
                             return (
@@ -1284,7 +1284,7 @@ export const Dashboard = ({ user, onLogout }) => {
                       {selectedCity && TAIWAN_DISTRICTS[selectedCity] && (
                         <div>
                           <label className="block text-xs font-bold text-slate-500 mb-2">選擇行政區（{selectedCity}）</label>
-                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[180px] pr-1">
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[220px] pr-1">
                             {TAIWAN_DISTRICTS[selectedCity].map(dist => {
                               const isSelected = selectedDistrict === dist;
                               return (
@@ -1331,7 +1331,7 @@ export const Dashboard = ({ user, onLogout }) => {
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第三步：你想去哪些目的地玩？（可複選）</h2>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px] pr-1">
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[380px] pr-1">
                         {["基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣", "澎湖縣", "金門縣", "連江縣"].map(city => {
                           const isSelected = formData.cities.includes(city);
                           return (
@@ -1457,7 +1457,7 @@ export const Dashboard = ({ user, onLogout }) => {
               </section>
             )}
 
-            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hidden lg:flex flex-col h-[620px] sticky top-6">
+            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hidden lg:flex flex-col h-[750px] sticky top-6">
               <h2 className="text-base font-bold text-slate-900 mb-2"> 地點即時預覽</h2>
               <div className="flex-1 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Preview"></iframe>
