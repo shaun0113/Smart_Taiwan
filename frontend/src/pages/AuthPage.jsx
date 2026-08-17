@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const GOOGLE_CLIENT_ID = "255342514400-0lq6v0h1cpj92or171ukfrv14sfhnefi.apps.googleusercontent.com";
 
+// 自動判斷本地或線上後端網址
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://127.0.0.1:8000'
   : 'https://smart-taiwan.onrender.com';
@@ -28,17 +29,12 @@ export const AuthPage = ({ onLoginSuccess }) => {
         const data = await res.json();
         if (res.ok) {
           localStorage.setItem('token', data.access_token);
-          if (onLoginSuccess) {
-            onLoginSuccess(data.user);
-          } else {
-            window.location.reload();
-          }
+          onLoginSuccess(data.user); // 完美對齊版別2的成功回呼
         } else {
           setErrorMsg(data.detail || 'Google 登入失敗');
         }
       } catch (err) {
-        console.error("Google 登入例外錯誤:", err);
-        setErrorMsg(`前端執行錯誤: ${err.message}`);
+        setErrorMsg('連線伺服器失敗');
       } finally {
         setLoading(false);
       }
@@ -103,18 +99,13 @@ export const AuthPage = ({ onLoginSuccess }) => {
 
         if (res.ok) {
           localStorage.setItem('token', data.access_token);
-          if (onLoginSuccess) {
-            onLoginSuccess(data.user);
-          } else {
-            window.location.reload();
-          }
+          onLoginSuccess(data.user); // 完美對齊版別2的成功回呼
         } else {
           setErrorMsg(data.detail || '操作失敗');
         }
       }
     } catch (err) {
-      console.error("登入表單例外錯誤:", err);
-      setErrorMsg(`前端執行錯誤: ${err.message}`);
+      setErrorMsg('無法連線至伺服器');
     } finally {
       setLoading(false);
     }
