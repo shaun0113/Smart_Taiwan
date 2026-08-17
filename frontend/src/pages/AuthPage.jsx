@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 
 const GOOGLE_CLIENT_ID = "255342514400-0lq6v0h1cpj92or171ukfrv14sfhnefi.apps.googleusercontent.com";
 
-// 自動判斷本地或線上後端網址
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://127.0.0.1:8000'
   : 'https://smart-taiwan.onrender.com';
@@ -26,16 +25,28 @@ export const AuthPage = ({ onLoginSuccess }) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ credential: response.credential })
         });
+        
         const data = await res.json();
-        if (res.ok) {
-          localStorage.setItem('token', data.access_token);
-          onLoginSuccess(data.user); // 完美對齊版別2的成功回呼
-        } else {
+        if (!res.ok) {
           setErrorMsg(data.detail || 'Google 登入失敗');
+          setLoading(false);
+          return;
+        }
+
+        // 成功取得 Token，安全存入並切換畫面
+        localStorage.setItem('token', data.access_token);
+        try {
+          if (onLoginSuccess) {
+            onLoginSuccess(data.user);
+          } else {
+            window.location.reload();
+          }
+        } catch (e) {
+          window.location.reload();
         }
       } catch (err) {
-        setErrorMsg('連線伺服器失敗');
-      } finally {
+        console.error("Google 登入例外:", err);
+        setErrorMsg('無法連線至伺服器');
         setLoading(false);
       }
     };
@@ -86,6 +97,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
         } else {
           setErrorMsg(data.detail || '重設失敗');
         }
+        setLoading(false);
       } else {
         const endpoint = authMode === 'login' ? `${API_BASE_URL}/api/auth/login` : `${API_BASE_URL}/api/auth/register`;
         const payload = authMode === 'login' ? { email, password } : { username, email, password };
@@ -97,16 +109,26 @@ export const AuthPage = ({ onLoginSuccess }) => {
         });
         const data = await res.json();
 
-        if (res.ok) {
-          localStorage.setItem('token', data.access_token);
-          onLoginSuccess(data.user); // 完美對齊版別2的成功回呼
-        } else {
+        if (!res.ok) {
           setErrorMsg(data.detail || '操作失敗');
+          setLoading(false);
+          return;
+        }
+
+        localStorage.setItem('token', data.access_token);
+        try {
+          if (onLoginSuccess) {
+            onLoginSuccess(data.user);
+          } else {
+            window.location.reload();
+          }
+        } catch (e) {
+          window.location.reload();
         }
       }
     } catch (err) {
+      console.error("表單送出例外:", err);
       setErrorMsg('無法連線至伺服器');
-    } finally {
       setLoading(false);
     }
   };
