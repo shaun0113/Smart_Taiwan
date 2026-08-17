@@ -393,7 +393,6 @@ export const Dashboard = ({ user, onLogout }) => {
       finalSpotsPayload = finalSpotsPayload ? `${finalSpotsPayload}+${selectedString}` : selectedString;
     }
 
-    // 🚀 關鍵防呆：強迫 AI 回傳最純淨的 JSON 格式
     const topologyConstraintPrompt = `${userNeed || ''} 
     【資管專題動態排程約束律】：
     1. 使用者標記必定要去且已選進清單的景點為：[ ${selectedSpots.join(', ')} ]。在規劃各天行程表時，這些勾選景點「必須 100% 被完整排入」，絕對不准漏掉。
@@ -440,7 +439,6 @@ export const Dashboard = ({ user, onLogout }) => {
       const data = await res.json();
       if (res.ok && data && data.result) {
         try {
-          // 🚀 防呆處理：把 AI 有時候會偷塞的 Markdown 反引號濾掉
           let cleanJson = data.result.replace(/```json/gi, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
           if (parsed.error) throw new Error(parsed.error);
@@ -474,7 +472,6 @@ export const Dashboard = ({ user, onLogout }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           current_itinerary: JSON.stringify({ itinerary: itineraryBlocks }),
-          // 🚀 修改時也要警告 AI 必須回傳 JSON
           modification_demand: userChoice + "\n【請保持與原本相同的 JSON 結構回傳，不要包含 ```json 等 Markdown 標記】"
         })
       });
@@ -709,20 +706,19 @@ export const Dashboard = ({ user, onLogout }) => {
                 onClick={() => setShowWarningModal(false)}
                 className="flex-1 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                ↩️ 返回修改（刪減景點）
+                 返回修改（刪減景點）
               </button>
               <button 
                 onClick={executeGenerateFinal}
                 className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
               >
-                ⚡ 確定要去，強行排程
+                 確定要去，強制排程
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 🚀 導覽列 */}
       <header className="border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-sm no-print relative z-40">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
           
@@ -803,12 +799,12 @@ export const Dashboard = ({ user, onLogout }) => {
                 ))}
               </div>
               
-              {/* 🚀 自訂圖片上傳區塊 */}
+              {/*  自訂圖片上傳區塊 */}
               {activeTheme === 'custom' && (
                  <div className="mt-3 p-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 text-center animate-fadeIn">
                     <input type="file" id="customBg" accept="image/*" className="hidden" onChange={handleImageUpload} />
                     <label htmlFor="customBg" className="cursor-pointer text-xs font-bold text-slate-600 hover:text-emerald-600 block w-full py-2">
-                      {customBgUrl ? '✅ 已成功套用自訂背景，點擊重新上傳' : '📸 點擊選擇電腦/手機裡的圖片'}
+                      {customBgUrl ? ' 已成功套用自訂背景，點擊重新上傳' : ' 點擊選擇電腦/手機裡的圖片'}
                     </label>
                  </div>
               )}
@@ -825,7 +821,7 @@ export const Dashboard = ({ user, onLogout }) => {
         <aside className={`absolute top-0 right-0 w-72 h-full bg-slate-50 dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-800">
             <span className="font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              <span className="text-xl">✨</span> 歷史對話
+              <span className="text-xl"></span> 歷史對話
             </span>
             <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 transition-colors">✕</button>
           </div>
@@ -833,11 +829,7 @@ export const Dashboard = ({ user, onLogout }) => {
           <div className="flex-1 overflow-y-auto p-3 space-y-1">
             <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase px-3 py-2">近期對話 (展示用)</div>
             {[
-              'Smart Taiwan 專案說明與程式碼',
-              'Vite 專案依賴安裝與執行',
-              'Git 協作程式碼衝突處理',
-              '2K26 82勝 META 陣容組建',
-              'Gem 客製化設定功能說明'
+              '歷史紀錄保存功能還在用',
             ].map((title, i) => (
               <button key={i} className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors truncate">
                 💬 {title}
@@ -846,7 +838,7 @@ export const Dashboard = ({ user, onLogout }) => {
             
             <div className="mt-6 px-3">
               <p className="text-xs text-emerald-600 dark:text-emerald-500 font-bold bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/50 leading-relaxed">
-                🚀 資料庫已開通。歷史紀錄保存功能開發中。
+                 資料庫已開通。歷史紀錄保存功能開發中。
               </p>
             </div>
           </div>
