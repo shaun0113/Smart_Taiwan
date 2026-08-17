@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 const GOOGLE_CLIENT_ID = "255342514400-0lq6v0h1cpj92or171ukfrv14sfhnefi.apps.googleusercontent.com";
 
 export const AuthPage = ({ onLoginSuccess }) => {
-  const [authMode, setAuthMode] = useState('login'); 
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'forgot'
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,12 +24,13 @@ export const AuthPage = ({ onLoginSuccess }) => {
         const data = await res.json();
         if (res.ok) {
           localStorage.setItem('token', data.access_token);
-          onLoginSuccess(data.user);
+          if (onLoginSuccess) onLoginSuccess(data.user);
         } else {
           setErrorMsg(data.detail || 'Google 登入失敗');
         }
       } catch (err) {
-        setErrorMsg('連線伺服器失敗');
+        console.error("Google 登入例外錯誤:", err);
+        setErrorMsg(`前端執行錯誤: ${err.message}`);
       } finally {
         setLoading(false);
       }
@@ -94,13 +95,14 @@ export const AuthPage = ({ onLoginSuccess }) => {
 
         if (res.ok) {
           localStorage.setItem('token', data.access_token);
-          onLoginSuccess(data.user);
+          if (onLoginSuccess) onLoginSuccess(data.user);
         } else {
           setErrorMsg(data.detail || '操作失敗');
         }
       }
     } catch (err) {
-      setErrorMsg('無法連線至伺服器');
+      console.error("登入表單例外錯誤:", err);
+      setErrorMsg(`前端執行錯誤: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -185,7 +187,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
               <div className="flex-1 border-t border-slate-200"></div>
             </div>
 
-            <div className="w-0.5-full flex justify-center">
+            <div className="w-full flex justify-center">
               <div id="googleButtonDiv" className="w-full flex justify-center"></div>
             </div>
           </>
