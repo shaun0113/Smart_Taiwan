@@ -95,8 +95,13 @@ export const Dashboard = ({ user, onLogout }) => {
   const [accumulatedSpots, setAccumulatedSpots] = useState('');
   const [apiMsg, setApiMsg] = useState(''); 
   const [userChoice, setUserChoice] = useState('');
-  const [finalItinerary, setFinalItinerary] = useState('');
   
+  const [itineraryBlocks, setItineraryBlocks] = useState([]);
+  const [isRouteModified, setIsRouteModified] = useState(false);
+  
+  const [dragItem, setDragItem] = useState(null);
+  const [dragOverItem, setDragOverItem] = useState(null);
+
   const [copySuccess, setCopySuccess] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [mapQuery, setMapQuery] = useState('臺北市');
@@ -208,7 +213,7 @@ export const Dashboard = ({ user, onLogout }) => {
     const travelMode = formData.transport === '自駕' ? 'd' : 'r';
     const targetCity = formData.cities[0] || '臺北市';
 
-    if (step === 6 && finalItinerary) { 
+    if (step === 6 && itineraryBlocks.length > 0) { 
       const origin = formData.start_location;
 
       if (isOffshoreSelected) {
@@ -225,36 +230,20 @@ export const Dashboard = ({ user, onLogout }) => {
         return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(transitDestination)}&dirflg=${travelMode}&output=embed`;
       }
 
-      const lines = finalItinerary.split('\n');
-      let firstSpot = null;
-      let inDetailSection = false;
+      const day1Spots = itineraryBlocks[0]?.spots || [];
+      const noiseWords = ['出發', '前往', '車程', '交通', '飯店', '民宿', '抵達', '台北', '臺北', '集合', '啟程', '跨縣市', '自駕', '機場', '碼頭', '登機', '車站', '高鐵', '台鐵', '火車'];
+      
+      const validSpots = day1Spots.filter(spot => {
+        const isNoise = noiseWords.some(w => spot.name.includes(w));
+        return spot.name && spot.name.length >= 2 && !isNoise;
+      });
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (line.includes('Day 1') || line.includes('DAY 1') || line.includes('第一天')) {
-          inDetailSection = true;
-        }
-
-        if (inDetailSection && line.match(/\d{2}:\d{2}/)) {
-          let potentialName = line.replace(/^\d{2}:\d{2}\s*[-─～~]\s*\d{2}:\d{2}/, '').trim();
-          potentialName = potentialName.replace(/[\*#_`\d\.\、\-\[\]\(\)【】\s📍🐾：:~\|]/g, '').trim();
-          const noiseWords = ['出發', '前往', '車程', '交通', '飯店', '民宿', '抵達', '台北', '臺北', '出發地', '集合', '啟程', '跨縣市', '自駕', '機場', '碼頭', '登機'];
-          const isNoise = noiseWords.some(w => potentialName.includes(w));
-
-          if (potentialName && potentialName.length >= 2 && potentialName.length < 25 && !isNoise) {
-            firstSpot = potentialName;
-            break; 
-          }
-        }
-      }
-
-      if (!firstSpot && selectedSpots.length > 0) {
-        firstSpot = selectedSpots[0];
-      }
-
-      if (firstSpot) {
-        const secureDestination = firstSpot.includes(targetCity.substring(0, 2)) ? firstSpot : `${targetCity}${firstSpot}`;
-        return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(secureDestination)}&dirflg=${travelMode}&output=embed`;
+      if (validSpots.length > 0) {
+        const waypoints = validSpots.map(spot => {
+          return spot.name.includes(targetCity.substring(0, 2)) ? spot.name : `${targetCity}${spot.name}`;
+        });
+        const daddrStr = waypoints.map(wp => encodeURIComponent(wp)).join('+to:');
+        return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${daddrStr}&dirflg=${travelMode}&output=embed`;
       }
     }
 
@@ -370,13 +359,15 @@ export const Dashboard = ({ user, onLogout }) => {
   };
 
   const handleCopyToClipboard = () => {
-    if (!finalItinerary) return;
-    navigator.clipboard.writeText(finalItinerary)
-      .then(() => {
-        setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 2000); 
-      })
-      .catch((err) => console.error('無法複製行程: ', err));
+    if (itineraryBlocks.length === 0) return;
+    const textFormat = itineraryBlocks.map(day => 
+      `${day.day_title}\n` + day.spots.map(s => `${s.time} - ${s.name} (${s.desc})`).join('\n')
+    ).join('\n\n');
+
+    navigator.clipboard.writeText(textFormat).then(() => {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000); 
+    });
   };
 
   const handlePrintPDF = () => {
@@ -402,13 +393,28 @@ export const Dashboard = ({ user, onLogout }) => {
       finalSpotsPayload = finalSpotsPayload ? `${finalSpotsPayload}+${selectedString}` : selectedString;
     }
 
+    // 🚀 關鍵防呆：強迫 AI 回傳最純淨的 JSON 格式
     const topologyConstraintPrompt = `${userNeed || ''} 
     【資管專題動態排程約束律】：
     1. 使用者標記必定要去且已選進清單的景點為：[ ${selectedSpots.join(', ')} ]。在規劃各天行程表時，這些勾選景點「必須 100% 被完整排入」，絕對不准漏掉。
     ${isOffshoreSelected ? `2. 【外島交通約束】：使用者選擇搭乘【${formData.offshore_transit}】前往 ${formData.cities.join(',')}。請在 Day 1 第一站前精準標註本島至外島的交通接駁（如機場報到/碼頭搭船）與預估航程時間。` : ''}
     3. 使用者勾選了 ${selectedSpots.length} 個景點，預計行程天數為 ${formData.days} 天。若勾選景點數量較多，請在【行程概要總覽】下方特別標註一行警示：「⚠️ 提醒：您選取的景點數量較多，部分景點停留時間將壓縮，請注意行程節奏。」
     4. 行程路線規劃必須符合地理鄰近性邏輯。嚴禁出現硬接、跨區大幅度來回折返、或前一站跟下一站相隔極遠的極端動線。排程以「同區域、距離近優先」為首要導向。
-    5. 如果使用者勾選的景點數量太少，無法排滿總計 ${formData.days} 天的行程空檔，AI 必須根據當前路線軌跡，主動「穿插推薦 1~2 個完全順路、鄰近的免費熱門小景點或美食」。`;
+    5. 如果使用者勾選的景點數量太少，無法排滿總計 ${formData.days} 天的行程空檔，AI 必須根據當前路線軌跡，主動「穿插推薦 1~2 個完全順路、鄰近的免費熱門小景點或美食」。
+    
+    【⚠️ 系統輸出格式強制要求】：
+    你必須「只」回傳一個合法的 JSON 格式字串，絕對不能包含任何其他說明文字或 Markdown 標記（如 \`\`\`json ）。
+    請嚴格遵守以下 JSON 結構：
+    {
+      "itinerary": [
+        {
+          "day_title": "Day 1：標題",
+          "spots": [
+            { "id": "1", "time": "09:00", "name": "景點名稱", "desc": "簡短描述" }
+          ]
+        }
+      ]
+    }`;
 
     await handleGenerateFinal(finalSpotsPayload, topologyConstraintPrompt);
   };
@@ -433,8 +439,17 @@ export const Dashboard = ({ user, onLogout }) => {
 
       const data = await res.json();
       if (res.ok && data && data.result) {
-        setFinalItinerary(data.result);
-        setStep(6); 
+        try {
+          // 🚀 防呆處理：把 AI 有時候會偷塞的 Markdown 反引號濾掉
+          let cleanJson = data.result.replace(/```json/gi, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(cleanJson);
+          if (parsed.error) throw new Error(parsed.error);
+          setItineraryBlocks(parsed.itinerary || []);
+          setIsRouteModified(false);
+          setStep(6); 
+        } catch (e) {
+          setErrorMsg(`JSON 解析失敗: ${e.message}。系統收到格式錯誤的資料，請再試一次。`);
+        }
       } else {
         setErrorMsg(`最終行程生成失敗：${data.detail || JSON.stringify(data)}`);
       }
@@ -458,15 +473,23 @@ export const Dashboard = ({ user, onLogout }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          current_itinerary: finalItinerary,
-          modification_demand: userChoice
+          current_itinerary: JSON.stringify({ itinerary: itineraryBlocks }),
+          // 🚀 修改時也要警告 AI 必須回傳 JSON
+          modification_demand: userChoice + "\n【請保持與原本相同的 JSON 結構回傳，不要包含 ```json 等 Markdown 標記】"
         })
       });
 
       const data = await res.json();
       if (res.ok && data && data.status === "success") {
-        setFinalItinerary(data.result);
-        setUserChoice(""); 
+        try {
+          let cleanJson = data.result.replace(/```json/gi, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(cleanJson);
+          setItineraryBlocks(parsed.itinerary || []);
+          setIsRouteModified(true);
+          setUserChoice(""); 
+        } catch (e) {
+          setErrorMsg(`JSON 解析失敗: ${e.message}`);
+        }
       } else {
         setErrorMsg(`微調行程失敗：${data.detail || JSON.stringify(data)}`);
       }
@@ -475,6 +498,66 @@ export const Dashboard = ({ user, onLogout }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDragStart = (e, dayIndex, spotIndex) => {
+    setDragItem({ dayIndex, spotIndex });
+    e.dataTransfer.effectAllowed = "move";
+    setTimeout(() => e.target.classList.add("opacity-50"), 0);
+  };
+
+  const handleDragEnter = (e, dayIndex, spotIndex) => {
+    e.preventDefault();
+    setDragOverItem({ dayIndex, spotIndex });
+  };
+
+  const handleDragEnd = (e) => {
+    e.target.classList.remove("opacity-50");
+    if (!dragItem || !dragOverItem) return;
+
+    if (dragItem.dayIndex === dragOverItem.dayIndex && dragItem.spotIndex === dragOverItem.spotIndex) {
+      setDragItem(null);
+      setDragOverItem(null);
+      return;
+    }
+
+    const newBlocks = [...itineraryBlocks];
+    const sourceDay = newBlocks[dragItem.dayIndex];
+    const targetDay = newBlocks[dragOverItem.dayIndex];
+
+    const [movedSpot] = sourceDay.spots.splice(dragItem.spotIndex, 1);
+    targetDay.spots.splice(dragOverItem.spotIndex, 0, movedSpot);
+
+    setItineraryBlocks(newBlocks);
+    setIsRouteModified(true); 
+    setDragItem(null);
+    setDragOverItem(null);
+  };
+
+  const handleDeleteSpot = (dayIndex, spotIndex) => {
+    const newBlocks = [...itineraryBlocks];
+    newBlocks[dayIndex].spots.splice(spotIndex, 1);
+    setItineraryBlocks(newBlocks);
+    setIsRouteModified(true);
+  };
+
+  const handleEditSpot = (dayIndex, spotIndex, field, value) => {
+    const newBlocks = [...itineraryBlocks];
+    newBlocks[dayIndex].spots[spotIndex][field] = value;
+    setItineraryBlocks(newBlocks);
+    setIsRouteModified(true);
+  };
+
+  const handleAddSpot = (dayIndex) => {
+    const newBlocks = [...itineraryBlocks];
+    newBlocks[dayIndex].spots.push({
+      id: `new-${Date.now()}`,
+      time: "12:00",
+      name: "新景點",
+      desc: "點擊修改描述"
+    });
+    setItineraryBlocks(newBlocks);
+    setIsRouteModified(true);
   };
 
   const allParsedSpots = parseSpotsToArray();
@@ -661,7 +744,6 @@ export const Dashboard = ({ user, onLogout }) => {
               ⚙️
             </button>
 
-            {/* 🚀 補回：歷史對話的兩條線按鈕 */}
             <button 
               onClick={() => setIsSidebarOpen(true)}
               className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex flex-col gap-1.5 justify-center items-center h-10 w-10 outline-none"
@@ -721,6 +803,7 @@ export const Dashboard = ({ user, onLogout }) => {
                 ))}
               </div>
               
+              {/* 🚀 自訂圖片上傳區塊 */}
               {activeTheme === 'custom' && (
                  <div className="mt-3 p-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 text-center animate-fadeIn">
                     <input type="file" id="customBg" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -810,7 +893,8 @@ export const Dashboard = ({ user, onLogout }) => {
                 <button onClick={handlePrintPDF} className="px-4 py-2 text-xs font-bold rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-all flex items-center gap-1.5 shadow-sm">匯出 PDF / 列印</button>
               </div>
 
-              <div className="bg-slate-50/70 rounded-xl p-8 border border-slate-100 min-h-[450px] text-slate-700 tracking-wide">
+              {/* 🚀 Scratch 拖曳方塊的 UI */}
+              <div className="bg-slate-50/70 rounded-xl p-8 border border-slate-100 min-h-[450px]">
                 {loading ? (
                   <div className="h-[350px] flex flex-col items-center justify-center">
                     <div className="flex items-center space-x-2">
@@ -821,20 +905,71 @@ export const Dashboard = ({ user, onLogout }) => {
                     <p className="text-xs font-semibold text-emerald-600 mt-5 tracking-wide">正在排程動線中，請稍候...</p>
                   </div>
                 ) : (
-                  <div className="prose prose-emerald prose-sm max-w-none text-left leading-relaxed space-y-3 
-                    prose-headings:text-emerald-800 prose-headings:font-black prose-headings:tracking-wide
-                    prose-h1:text-2xl prose-h1:border-b prose-h1:pb-2 prose-h1:mt-6 prose-h1:mb-4
-                    prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-3
-                    prose-h3:text-lg prose-h3:font-black prose-h3:text-emerald-700 prose-h3:mt-5 prose-h3:mb-2 prose-h3:bg-emerald-50/80 prose-h3:p-2.5 prose-h3:rounded-lg prose-h3:border-l-4 prose-h3:border-emerald-600
-                    prose-p:mb-2 prose-p:leading-relaxed prose-p:text-slate-700 prose-strong:font-bold prose-strong:text-slate-900
-                    prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1 prose-li:my-0.5">
-                    <ReactMarkdown>
-                      {(finalItinerary || '')
-                        .replace(/<br\s*\/?>/gi, '\n')
-                        .replace(/\$\\rightarrow\$/g, '→')
-                        .replace(/\\rightarrow/g, '→')}
-                    </ReactMarkdown>
-                  </div>
+                  <>
+                    {isRouteModified && (
+                      <div className="mb-6 bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm font-bold flex items-center gap-3 shadow-sm">
+                        <span className="text-xl">⚠️</span>
+                        系統提醒：預設行程為計算出的最佳路線。手動新增、刪除或拖曳方塊更改順序，可能導致動線折返或不順路。
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-6">
+                      {itineraryBlocks.map((day, dayIndex) => (
+                        <div key={dayIndex} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                          <div className="flex justify-between items-center mb-4 border-b pb-2">
+                            <h3 className="text-lg font-black text-emerald-700">{day.day_title}</h3>
+                            <button onClick={() => handleAddSpot(dayIndex)} className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-100 transition-colors no-print">+ 新增方塊</button>
+                          </div>
+                          
+                          <div className="flex flex-col gap-3">
+                            {day.spots.map((spot, spotIndex) => (
+                              <div
+                                key={spot.id || spotIndex}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, dayIndex, spotIndex)}
+                                onDragEnter={(e) => handleDragEnter(e, dayIndex, spotIndex)}
+                                onDragEnd={handleDragEnd}
+                                onDragOver={(e) => e.preventDefault()}
+                                className="bg-slate-50 border border-slate-200 p-3 rounded-xl shadow-xs flex items-center gap-3 cursor-grab active:cursor-grabbing hover:border-emerald-400 hover:shadow-md transition-all group"
+                              >
+                                <div className="text-slate-300 cursor-grab px-1 no-print">⣿</div>
+                                
+                                <div className="flex-1 grid grid-cols-12 gap-3 items-center">
+                                  <input 
+                                    type="time"
+                                    className="col-span-3 lg:col-span-2 text-sm font-bold text-slate-600 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-emerald-500 outline-none transition-colors cursor-pointer"
+                                    value={spot.time}
+                                    onChange={(e) => handleEditSpot(dayIndex, spotIndex, 'time', e.target.value)}
+                                  />
+                                  <input 
+                                    className="col-span-9 lg:col-span-4 text-sm font-extrabold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-emerald-500 outline-none transition-colors"
+                                    value={spot.name}
+                                    onChange={(e) => handleEditSpot(dayIndex, spotIndex, 'name', e.target.value)}
+                                  />
+                                  <input 
+                                    className="col-span-12 lg:col-span-6 text-xs text-slate-500 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-emerald-500 outline-none transition-colors"
+                                    value={spot.desc}
+                                    onChange={(e) => handleEditSpot(dayIndex, spotIndex, 'desc', e.target.value)}
+                                  />
+                                </div>
+
+                                <button onClick={() => handleDeleteSpot(dayIndex, spotIndex)} className="text-slate-300 hover:text-red-500 font-bold px-2 transition-colors opacity-0 group-hover:opacity-100 no-print">✕</button>
+                              </div>
+                            ))}
+                            {day.spots.length === 0 && (
+                              <div 
+                                className="p-5 border-2 border-dashed border-slate-300 rounded-xl text-center text-slate-400 text-sm font-bold bg-slate-50"
+                                onDragEnter={(e) => handleDragEnter(e, dayIndex, 0)}
+                                onDragOver={(e) => e.preventDefault()}
+                              >
+                                拖曳方塊至此
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
 
