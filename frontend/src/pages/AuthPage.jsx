@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 
 const GOOGLE_CLIENT_ID = "255342514400-0lq6v0h1cpj92or171ukfrv14sfhnefi.apps.googleusercontent.com";
 
-// 🚀 自動判斷環境：本地用 8000埠，線上用 Render 雲端後端
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://127.0.0.1:8000'
   : 'https://smart-taiwan.onrender.com';
 
 export const AuthPage = ({ onLoginSuccess }) => {
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'forgot'
+  const [authMode, setAuthMode] = useState('login'); 
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,7 +28,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
         const data = await res.json();
         if (res.ok) {
           localStorage.setItem('token', data.access_token);
-          if (onLoginSuccess) onLoginSuccess(data.user);
+          window.location.reload();
         } else {
           setErrorMsg(data.detail || 'Google 登入失敗');
         }
@@ -65,7 +64,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
     } else {
       loadGoogleScript();
     }
-  }, [onLoginSuccess]);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -100,7 +99,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
 
         if (res.ok) {
           localStorage.setItem('token', data.access_token);
-          if (onLoginSuccess) onLoginSuccess(data.user);
+          window.location.reload();
         } else {
           setErrorMsg(data.detail || '操作失敗');
         }
