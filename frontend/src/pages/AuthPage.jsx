@@ -7,7 +7,7 @@ const API_BASE_URL = window.location.hostname === 'localhost' || window.location
   : 'https://smart-taiwan.onrender.com';
 
 export const AuthPage = ({ onLoginSuccess }) => {
-  const [authMode, setAuthMode] = useState('login'); 
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'forgot'
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,7 +28,11 @@ export const AuthPage = ({ onLoginSuccess }) => {
         const data = await res.json();
         if (res.ok) {
           localStorage.setItem('token', data.access_token);
-          window.location.reload();
+          if (onLoginSuccess) {
+            onLoginSuccess(data.user);
+          } else {
+            window.location.reload();
+          }
         } else {
           setErrorMsg(data.detail || 'Google 登入失敗');
         }
@@ -64,7 +68,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
     } else {
       loadGoogleScript();
     }
-  }, []);
+  }, [onLoginSuccess]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -99,7 +103,11 @@ export const AuthPage = ({ onLoginSuccess }) => {
 
         if (res.ok) {
           localStorage.setItem('token', data.access_token);
-          window.location.reload();
+          if (onLoginSuccess) {
+            onLoginSuccess(data.user);
+          } else {
+            window.location.reload();
+          }
         } else {
           setErrorMsg(data.detail || '操作失敗');
         }
