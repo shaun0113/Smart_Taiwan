@@ -1122,10 +1122,10 @@ export const Dashboard = ({ user, onLogout }) => {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             
             {step === 5 ? (
-              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[750px] animate-fadeIn">
+              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[750px] lg:col-span-5 animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"> 景點推薦名單</h2>
@@ -1237,7 +1237,7 @@ export const Dashboard = ({ user, onLogout }) => {
                 </div>
               </section>
             ) : (
-              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[750px]">
+              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[750px] lg:col-span-5">
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="space-y-4 animate-fadeIn">
@@ -1457,7 +1457,7 @@ export const Dashboard = ({ user, onLogout }) => {
               </section>
             )}
 
-            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hidden lg:flex flex-col h-[750px] sticky top-6">
+            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hidden lg:flex flex-col h-[730px] lg:col-span-7 sticky top-6">
               <h2 className="text-base font-bold text-slate-900 mb-2"> 地點即時預覽</h2>
               <div className="flex-1 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Preview"></iframe>
