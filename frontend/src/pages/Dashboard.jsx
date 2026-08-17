@@ -1003,7 +1003,7 @@ export const Dashboard = ({ user, onLogout }) => {
         {step === 6 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 map-section no-print">
-              <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（出發地 ➔ 目的地首站/搭乘處）</h2>
+              <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（點擊更多選項可以看第一天所有行程導航圖）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Navigation"></iframe>
               </div>
