@@ -945,7 +945,7 @@ export const Dashboard = ({ user, onLogout }) => {
         <aside className={`absolute top-0 right-0 w-80 h-full bg-slate-50 dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-800">
             <span className="font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              <span className="text-xl">✨</span> 我的專屬行程簿
+              <span className="text-xl">歷史紀錄</span> 我的專屬行程簿
             </span>
             <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 transition-colors">✕</button>
           </div>
