@@ -91,7 +91,7 @@ class SmartTourEngine:
             db_spots = [{"name": "系統備用模式", "address": "請 AI 依據知名地標排程", "description": "本地數據庫無符合景點"}]
 
         sys_instruction = """
-        你是一個台灣旅遊景點推薦機器人。請從資料庫清單中挑選 10 到 15 個景點。
+        你是一個台灣旅遊景點推薦機器人。請從資料庫清單中挑選 25 到 50 個景點。
         每一行景點請務必嚴格使用以下格式輸出：
         1|景點名稱|地圖定位地址|一句話特色與推薦理由
 
@@ -102,7 +102,7 @@ class SmartTourEngine:
         """
 
         user_prompt = f"""
-        請從下方真實景點數據庫中，精選出 10-15 個適合【{', '.join(tags)}】的景點。
+        請從下方真實景點數據庫中，精選出 25-50 個適合【{', '.join(tags)}】的景點。
 
         目的地：{', '.join(target_cities)}
         需求：{user_need}
@@ -114,7 +114,7 @@ class SmartTourEngine:
         last_error = None
         for index, key in enumerate(self.api_keys):
             try:
-                logger.info(f"🔄 景點推薦中，嘗試第 {index + 1} 把 Key...")
+                logger.info(f" 景點推薦中，嘗試第 {index + 1} 把 Key...")
                 client = genai.Client(api_key=key)
                 response = client.models.generate_content(
                     model=self.model_name,
