@@ -1,243 +1,120 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { login, register } from '../services/auth';
 
-const GOOGLE_CLIENT_ID = "255342514400-0lq6v0h1cpj92or171ukfrv14sfhnefi.apps.googleusercontent.com";
-
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://127.0.0.1:8000'
-  : 'https://smart-taiwan.onrender.com';
-
-export const AuthPage = ({ onLoginSuccess }) => {
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'forgot'
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+export function AuthPage({ onAuthenticated }) {
+  const [mode, setMode] = useState('login');
+  const [form, setForm] = useState({ username: '', email: '', password: '' });
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const handleGoogleResponse = async (response) => {
-      try {
-        setLoading(true);
-        setErrorMsg('');
-        const res = await fetch(`${API_BASE_URL}/api/auth/google-login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ credential: response.credential })
-        });
-        
-        const data = await res.json();
-        if (!res.ok) {
-          setErrorMsg(data.detail || 'Google 登入失敗');
-          setLoading(false);
-          return;
-        }
+  const isRegister = mode === 'register';
 
-        // 成功取得 Token，安全存入並切換畫面
-        localStorage.setItem('token', data.access_token);
-        try {
-          if (onLoginSuccess) {
-            onLoginSuccess(data.user);
-          } else {
-            window.location.reload();
-          }
-        } catch (e) {
-          window.location.reload();
-        }
-      } catch (err) {
-        console.error("Google 登入例外:", err);
-        setErrorMsg('無法連線至伺服器');
-        setLoading(false);
-      }
-    };
-
-    const loadGoogleScript = () => {
-      if (window.google) {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleGoogleResponse,
-        });
-        window.google.accounts.id.renderButton(
-          document.getElementById('googleButtonDiv'),
-          { theme: 'outline', size: 'large', width: '100%' }
-        );
-      }
-    };
-
-    if (!document.getElementById('google-client-script')) {
-      const script = document.createElement('script');
-      script.id = 'google-client-script';
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = loadGoogleScript;
-      document.body.appendChild(script);
-    } else {
-      loadGoogleScript();
-    }
-  }, [onLoginSuccess]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setErrorMsg('');
-    setSuccessMsg('');
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
     setLoading(true);
 
     try {
-      if (authMode === 'forgot') {
-        const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, new_password: password })
-        });
-        const data = await res.json();
-        if (res.ok) {
-          setSuccessMsg('密碼重設成功！請切換回登入頁面進行登入。');
-          setPassword('');
-        } else {
-          setErrorMsg(data.detail || '重設失敗');
-        }
-        setLoading(false);
-      } else {
-        const endpoint = authMode === 'login' ? `${API_BASE_URL}/api/auth/login` : `${API_BASE_URL}/api/auth/register`;
-        const payload = authMode === 'login' ? { email, password } : { username, email, password };
-
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-
-        if (!res.ok) {
-          setErrorMsg(data.detail || '操作失敗');
-          setLoading(false);
-          return;
-        }
-
-        localStorage.setItem('token', data.access_token);
-        try {
-          if (onLoginSuccess) {
-            onLoginSuccess(data.user);
-          } else {
-            window.location.reload();
-          }
-        } catch (e) {
-          window.location.reload();
-        }
-      }
+      const data = isRegister
+        ? await register(form)
+        : await login({ email: form.email, password: form.password });
+      onAuthenticated(data.user);
     } catch (err) {
-      console.error("表單送出例外:", err);
-      setErrorMsg('無法連線至伺服器');
-      setLoading(false);
+      setError(err.message);
+    } finally {
+      setLoading(false);ㄈ
     }
-  };
+  }
+
+  function switchMode(nextMode) {
+    setMode(nextMode);
+    setError('');
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-100 p-8 flex flex-col gap-6">
-        
-        <div className="text-center">
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">智遊台灣 Smart Tour</h1>
-          <p className="text-xs text-slate-400 mt-1">你的專屬 AI 智慧旅遊排程系統</p>
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl p-7">
+        <div className="text-center mb-7">
+          <div className="text-4xl mb-3">🧭</div>
+          <h1 className="text-2xl font-extrabold text-slate-900">智遊台灣</h1>
+          <p className="text-sm text-slate-500 mt-2">登入後開始建立你的專屬旅遊行程</p>
         </div>
 
-        {errorMsg && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-xs font-bold animate-fadeIn">
-            {errorMsg}
-          </div>
-        )}
+        <div className="grid grid-cols-2 bg-slate-100 rounded-xl p-1 mb-6">
+          <button
+            type="button"
+            onClick={() => switchMode('login')}
+            className={`py-2 rounded-lg text-sm font-bold transition ${!isRegister ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}
+          >
+            登入
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode('register')}
+            className={`py-2 rounded-lg text-sm font-bold transition ${isRegister ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}
+          >
+            註冊
+          </button>
+        </div>
 
-        {successMsg && (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-xs font-bold animate-fadeIn">
-            {successMsg}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {authMode === 'register' && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {isRegister && (
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">使用者名稱</label>
-              <input 
-                type="text" 
-                required 
-                value={username} 
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="請輸入你的暱稱"
-                className="w-full text-xs rounded-xl border border-slate-300 px-4 py-3 focus:border-emerald-500 outline-none"
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">使用者名稱</label>
+              <input
+                type="text"
+                value={form.username}
+                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                minLength={2}
+                maxLength={50}
+                required
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-500"
+                placeholder="例如：廷友"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">電子郵件</label>
-            <input 
-              type="email" 
-              required 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)}
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              required
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-500"
               placeholder="name@example.com"
-              className="w-full text-xs rounded-xl border border-slate-300 px-4 py-3 focus:border-emerald-500 outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">
-              {authMode === 'forgot' ? '新密碼 (至少8碼)' : '密碼'}
-            </label>
-            <input 
-              type="password" 
-              required 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full text-xs rounded-xl border border-slate-300 px-4 py-3 focus:border-emerald-500 outline-none"
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">密碼</label>
+            <input
+              type="password"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              minLength={isRegister ? 8 : 1}
+              maxLength={72}
+              required
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-500"
+              placeholder={isRegister ? '至少 8 個字元' : '請輸入密碼'}
             />
           </div>
 
-          <button 
-            type="submit" 
+          {error && (
+            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm font-semibold text-red-600">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow-md mt-2 cursor-pointer disabled:bg-slate-300"
+            className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-3 transition"
           >
-            {loading ? '處理中...' : (authMode === 'login' ? '登入系統' : authMode === 'register' ? '註冊帳號' : '確認重設密碼')}
+            {loading ? '處理中…' : isRegister ? '建立帳號' : '登入系統'}
           </button>
         </form>
-
-        {authMode === 'login' && (
-          <>
-            <div className="flex items-center my-1">
-              <div className="flex-1 border-t border-slate-200"></div>
-              <span className="px-3 text-[11px] text-slate-400 font-semibold">或使用第三方登入</span>
-              <div className="flex-1 border-t border-slate-200"></div>
-            </div>
-
-            <div className="w-full flex justify-center">
-              <div id="googleButtonDiv" className="w-full flex justify-center"></div>
-            </div>
-          </>
-        )}
-
-        <div className="flex justify-between items-center mt-2 text-xs font-bold">
-          {authMode === 'login' ? (
-            <>
-              <button type="button" onClick={() => setAuthMode('forgot')} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                忘記密碼？
-              </button>
-              <button type="button" onClick={() => setAuthMode('register')} className="text-emerald-600 hover:text-emerald-700 cursor-pointer">
-                註冊新帳號
-              </button>
-            </>
-          ) : (
-            <button type="button" onClick={() => { setAuthMode('login'); setErrorMsg(''); setSuccessMsg(''); }} className="w-full text-center text-emerald-600 hover:text-emerald-700 cursor-pointer">
-              ← 返回登入頁面
-            </button>
-          )}
-        </div>
-
       </div>
     </div>
   );
-};
-
-export default AuthPage;
+}
