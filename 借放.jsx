@@ -114,11 +114,20 @@ export const Dashboard = ({ user, onLogout }) => {
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [activeTheme, setActiveTheme] = useState('emerald');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [customBgUrl, setCustomBgUrl] = useState(''); 
 
   const resultEndRef = useRef(null);
   const itineraryRef = useRef(null);
 
   const isOffshoreSelected = formData.cities.some(c => OFFSHORE_ISLANDS.some(island => c.includes(island)));
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const imageUrl = URL.createObjectURL(file);
+      setCustomBgUrl(imageUrl);
+    }
+  };
 
   useEffect(() => {
     if (isDarkMode) {
@@ -129,10 +138,8 @@ export const Dashboard = ({ user, onLogout }) => {
   }, [isDarkMode]);
 
   useEffect(() => {
-    setTimeout(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-    }, 50);
-  }, [step, currentPage]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [step]);
 
   useEffect(() => {
     if (!loading && step === 5) { 
@@ -286,7 +293,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setCurrentPage(1);
       setSelectedSpots([]); 
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/recommend-spots', {
+      const res = await fetch('https://smart-taiwan.onrender.com/api/v1/recommend-spots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -309,7 +316,7 @@ export const Dashboard = ({ user, onLogout }) => {
         setStep(4);
       }
     } catch (error) {
-      setErrorMsg("連線失敗，請確認後端已啟動 (http://127.0.0.1:8000)。");
+      setErrorMsg("景點海選連線失敗，請確認 Render 後端雲端服務是否正常啟動。");
       setStep(4);
     } finally {
       setLoading(false);
@@ -325,7 +332,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setErrorMsg("");
       setMapQuery(userChoice);
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/analyze-selection', {
+      const res = await fetch('https://smart-taiwan.onrender.com/api/v1/analyze-selection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -345,7 +352,7 @@ export const Dashboard = ({ user, onLogout }) => {
         setErrorMsg(`意見微調失敗：${data.detail || JSON.stringify(data)}`);
       }
     } catch (error) {
-      setErrorMsg("微調意見發送失敗，請檢查後端連線。");
+      setErrorMsg("微調意見發送失敗，請檢查雲端後端連線。");
     } finally {
       setLoading(false);
     }
@@ -371,8 +378,11 @@ export const Dashboard = ({ user, onLogout }) => {
   const isOvercrowded = selectedSpots.length > maxRecommendedSpots;
 
   const handleConfirmAndGenerateFinal = () => {
-    if (isOvercrowded) setShowWarningModal(true);
-    else executeGenerateFinal();
+    if (isOvercrowded) {
+      setShowWarningModal(true);
+    } else {
+      executeGenerateFinal();
+    }
   };
 
   const executeGenerateFinal = async () => {
@@ -385,13 +395,26 @@ export const Dashboard = ({ user, onLogout }) => {
 
     const topologyConstraintPrompt = `${userNeed || ''} 
     【資管專題動態排程約束律】：
-    1. 使用者標記必定要去且已選進清單的景點為：[ ${selectedSpots.join(', ')} ]。必須 100% 被排入。
-    2. 出發時間為【${formData.start_time || '08:00'}】。
-    3. 【營業時間嚴格約束】：排入景點前，必須使用你的內建知識庫查證該景點真實的「營業時間」與「公休日」。
-       - 絕對禁止將只開到傍晚的景點（例如：十鼓文創園區、各大博物館、農場、多數自然風景區）排到晚上（17:30 之後）。
-       - 絕對禁止將夜市或夜景景點排在早上或下午。
-       - 若晚間時段沒有使用者勾選的景點可排，請自動穿插當地知名的「夜市」、「商圈」或「適合夜間造訪的景點」來填補空檔。
-    `;
+    1. 使用者標記必定要去且已選進清單的景點為：[ ${selectedSpots.join(', ')} ]。在規劃各天行程表時，這些勾選景點「必須 100% 被完整排入」，絕對不准漏掉。
+    ${isOffshoreSelected ? `2. 【外島交通約束】：使用者選擇搭乘【${formData.offshore_transit}】前往 ${formData.cities.join(',')}。請在 Day 1 第一站前精準標註本島至外島的交通接駁（如機場報到/碼頭搭船）與預估航程時間。` : ''}
+    3. 使用者勾選了 ${selectedSpots.length} 個景點，預計行程天數為 ${formData.days} 天。若勾選景點數量較多，請在【行程概要總覽】下方特別標註一行警示：「⚠️ 提醒：您選取的景點數量較多，部分景點停留時間將壓縮，請注意行程節奏。」
+    4. 行程路線規劃必須符合地理鄰近性邏輯。嚴禁出現硬接、跨區大幅度來回折返、或前一站跟下一站相隔極遠的極端動線。排程以「同區域、距離近優先」為首要導向。
+    5. 如果使用者勾選的景點數量太少，無法排滿總計 ${formData.days} 天的行程空檔，AI 必須根據當前路線軌跡，主動「穿插推薦 1~2 個完全順路、鄰近的免費熱門小景點或美食」。
+    
+    【⚠️ 系統輸出格式強制要求】：
+    你必須「只」回傳一個合法的 JSON 格式字串，絕對不能包含任何其他說明文字或 Markdown 標記（如 \`\`\`json ）。
+    請嚴格遵守以下 JSON 結構：
+    {
+      "itinerary": [
+        {
+          "day_title": "Day 1：標題",
+          "spots": [
+            { "id": "1", "time": "09:00", "name": "景點名稱", "desc": "簡短描述" }
+          ]
+        }
+      ]
+    }`;
+
     await handleGenerateFinal(finalSpotsPayload, topologyConstraintPrompt);
   };
 
@@ -400,15 +423,12 @@ export const Dashboard = ({ user, onLogout }) => {
       setLoading(true);
       setErrorMsg("");
 
-      const baseUserNeed = OverrideUserNeed || userNeed || `出發地：${formData.start_location}，天數：${formData.days}天`;
-      const finalUserNeed = `${baseUserNeed}\n出發時間：${formData.start_time || '08:00'}\n出發地：${formData.start_location}`;
-
-      const res = await fetch('http://127.0.0.1:8000/api/v1/generate-final', {
+      const res = await fetch('https://smart-taiwan.onrender.com/api/v1/generate-final', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accumulated_spots: targetSpots || accumulatedSpots, 
-          user_need: finalUserNeed,
+          user_need: OverrideUserNeed || userNeed || `出發地：${formData.start_location}，預計行程天數：${formData.days}天`, 
           city: formData.cities.join(','),       
           transport: isOffshoreSelected ? `外島(${formData.offshore_transit})+當地${formData.transport}` : formData.transport,
           start_location: formData.start_location, 
@@ -419,19 +439,20 @@ export const Dashboard = ({ user, onLogout }) => {
       const data = await res.json();
       if (res.ok && data && data.result) {
         try {
-          const parsed = JSON.parse(data.result);
+          let cleanJson = data.result.replace(/```json/gi, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(cleanJson);
           if (parsed.error) throw new Error(parsed.error);
           setItineraryBlocks(parsed.itinerary || []);
           setIsRouteModified(false);
           setStep(6); 
         } catch (e) {
-          setErrorMsg(`JSON 解析失敗: ${e.message}。回傳內容: ${data.result}`);
+          setErrorMsg(`JSON 解析失敗: ${e.message}。系統收到格式錯誤的資料，請再試一次。`);
         }
       } else {
         setErrorMsg(`最終行程生成失敗：${data.detail || JSON.stringify(data)}`);
       }
     } catch (err) {
-      setErrorMsg(`連線錯誤：${err.message}`);
+      setErrorMsg(`最終行程表生成失敗。原因：${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -444,31 +465,33 @@ export const Dashboard = ({ user, onLogout }) => {
     try {
       setLoading(true);
       setErrorMsg("");
+      setMapQuery(userChoice);
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/modify-itinerary', {
+      const res = await fetch('https://smart-taiwan.onrender.com/api/v1/modify-itinerary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           current_itinerary: JSON.stringify({ itinerary: itineraryBlocks }),
-          modification_demand: userChoice
+          modification_demand: userChoice + "\n【請保持與原本相同的 JSON 結構回傳，不要包含 ```json 等 Markdown 標記】"
         })
       });
 
       const data = await res.json();
       if (res.ok && data && data.status === "success") {
         try {
-          const parsed = JSON.parse(data.result);
+          let cleanJson = data.result.replace(/```json/gi, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(cleanJson);
           setItineraryBlocks(parsed.itinerary || []);
-          setIsRouteModified(true); // AI 改的也算修改過路線
+          setIsRouteModified(true);
           setUserChoice(""); 
         } catch (e) {
           setErrorMsg(`JSON 解析失敗: ${e.message}`);
         }
       } else {
-        setErrorMsg(`微調失敗：${data.detail || JSON.stringify(data)}`);
+        setErrorMsg(`微調行程失敗：${data.detail || JSON.stringify(data)}`);
       }
     } catch (error) {
-      setErrorMsg("行程表微調請求失敗。");
+      setErrorMsg("行程表微調請求失敗，請確認 Render 後端雲端服務是否正常。");
     } finally {
       setLoading(false);
     }
@@ -538,23 +561,24 @@ export const Dashboard = ({ user, onLogout }) => {
   const totalPages = Math.ceil(allParsedSpots.length / spotsPerPage);
   const currentPagedSpots = getPagedSpots();
 
+  const currentThemeData = THEMES[activeTheme];
+  const displayBgDay = activeTheme === 'custom' && customBgUrl ? `url('${customBgUrl}')` : currentThemeData.bgDay;
+  const displayBgNight = activeTheme === 'custom' && customBgUrl ? `linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.95)), url('${customBgUrl}')` : currentThemeData.bgNight;
+
   return (
-    <div className="min-h-screen flex flex-col transition-colors duration-500 pb-20">
-      
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 relative">
       <style>{`
         :root {
-          /* 日間模式變數 */
-          --theme-50: ${THEMES[activeTheme][50]};
-          --theme-100: ${THEMES[activeTheme][100]};
-          --theme-200: ${THEMES[activeTheme][200]};
-          --theme-500: ${THEMES[activeTheme][500]};
-          --theme-600: ${THEMES[activeTheme][600]};
-          --theme-700: ${THEMES[activeTheme][700]};
-          --theme-bg-day: ${THEMES[activeTheme].bgDay};
-          --theme-bg-night: ${THEMES[activeTheme].bgNight};
+          --theme-50: ${currentThemeData[50]};
+          --theme-100: ${currentThemeData[100]};
+          --theme-200: ${currentThemeData[200]};
+          --theme-500: ${currentThemeData[500]};
+          --theme-600: ${currentThemeData[600]};
+          --theme-700: ${currentThemeData[700]};
+          --theme-bg-day: ${displayBgDay};
+          --theme-bg-night: ${displayBgNight};
         }
 
-        /* 繪製情境背景 (Day Mode) */
         html, body, #root, .min-h-screen {
           background-color: var(--theme-50) !important;
           background-image: var(--theme-bg-day) !important;
@@ -564,7 +588,6 @@ export const Dashboard = ({ user, onLogout }) => {
           background-repeat: no-repeat !important;
         }
 
-        /* 讓白色卡片帶有一點點毛玻璃透視，隱約透出背景風景 */
         html:not(.dark-mode) .bg-white {
           background-color: rgba(255, 255, 255, 0.94) !important;
           backdrop-filter: blur(8px) !important;
@@ -594,11 +617,7 @@ export const Dashboard = ({ user, onLogout }) => {
         .accent-emerald-600 { accent-color: var(--theme-600) !important; }
         .focus\\:ring-emerald-500:focus { --tw-ring-color: var(--theme-500) !important; }
 
-        /* =========================================
-           🌟 暗黑夜間模式 (Dark Mode) CSS Overrides
-           ========================================= */
         html.dark-mode {
-          /* 核心灰階色調反轉 */
           --bg-main: #0f172a;     
           --bg-card: #1e293b;     
           --bg-hover: #334155;    
@@ -612,7 +631,6 @@ export const Dashboard = ({ user, onLogout }) => {
           --text-500: #94a3b8;
           --text-400: #64748b;
           
-          /* 夜間模式的「主色調」會自動混入深色背景，防止刺眼 */
           --theme-50: color-mix(in srgb, var(--theme-500) 15%, var(--bg-main)) !important;
           --theme-100: color-mix(in srgb, var(--theme-500) 25%, var(--bg-main)) !important;
           --theme-200: color-mix(in srgb, var(--theme-500) 40%, var(--bg-main)) !important;
@@ -621,14 +639,12 @@ export const Dashboard = ({ user, onLogout }) => {
           color-scheme: dark; 
         }
 
-        /* 繪製情境背景 (Night Mode) */
         html.dark-mode, html.dark-mode body, html.dark-mode #root, html.dark-mode .min-h-screen {
           background-color: var(--bg-main) !important;
           background-image: var(--theme-bg-night) !important;
           color: var(--text-800) !important;
         }
 
-        /* 覆寫所有預設的卡片顏色與毛玻璃設定 */
         html.dark-mode .bg-white { 
           background-color: rgba(30, 41, 59, 0.88) !important; 
           backdrop-filter: blur(8px) !important;
@@ -658,78 +674,103 @@ export const Dashboard = ({ user, onLogout }) => {
         
         html.dark-mode .bg-slate-900\\/60 { background-color: rgba(15, 23, 42, 0.8) !important; }
         
-        /* 行程被修改的警告框（配給夜間模式的深色） */
         html.dark-mode .bg-amber-50 { background-color: rgba(69, 26, 3, 0.5) !important; border-color: rgba(120, 53, 15, 0.6) !important; color: #fde68a !important; }
         html.dark-mode .text-amber-600 { color: #fbbf24 !important; }
         html.dark-mode .text-amber-800 { color: #fef3c7 !important; }
 
         @media print {
           body, html { background-color: #ffffff !important; color: #000000 !important; }
-          header, .mb-6, iframe, h2, .no-print, form, h3, .mt-6, .map-section { display: none !important; }
-          main { max-width: 100% !important; width: 100% !important; padding: 0 !important; }
-          .print-area { border: none !important; box-shadow: none !important; }
-          input { border: none !important; outline: none !important; }
+          header, .mb-6, iframe, h2, .no-print, form, h3, .mt-6, .map-section { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
+          main { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
+          .print-area { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
+          .bg-slate-50\\/70 { background: transparent !important; border: none !important; padding: 0 !important; }
         }
       `}</style>
 
-      {/* --- 右側 Sidebar：歷史紀錄 (改從右邊滑出) --- */}
-      <div className={`fixed inset-0 z-50 transition-opacity no-print ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
-        <aside className={`absolute top-0 right-0 w-72 h-full bg-slate-50 dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col gap-1 bg-white dark:bg-slate-800">
-            <div className="flex justify-between items-center">
-              <span className="font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <span className="text-xl">✨</span> 歷史對話
-              </span>
-              <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 transition-colors">✕</button>
+      {showWarningModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-4">
+            <div className="flex items-center gap-3 text-amber-600">
+              <span className="text-3xl">⚠️</span>
+              <h3 className="text-lg font-extrabold text-slate-900 m-0">行程可能太緊湊！</h3>
             </div>
-            {/* 🚀 顯示登入者名稱 */}
-            {user && <span className="text-xs font-bold text-emerald-600 dark:text-emerald-500 mt-2">👋 歡迎回來，{user.username}</span>}
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-3 space-y-1">
-            <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase px-3 py-2">近期對話 (展示用)</div>
-            {[
-              'Smart Taiwan 專案說明與程式碼',
-              'Vite 專案依賴安裝與執行',
-              'Git 協作程式碼衝突處理',
-              '2K26 82勝 META 陣容組建',
-              'Gem 客製化設定功能說明'
-            ].map((title, i) => (
-              <button key={i} className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors truncate">
-                💬 {title}
+
+            <p className="text-xs text-slate-600 leading-relaxed m-0 bg-amber-50/60 border border-amber-200/80 p-3.5 rounded-xl">
+              您規劃了 <span className="font-extrabold text-amber-900">{formData.days} 天</span> 的行程，但目前勾選了 <span className="font-extrabold text-amber-900">{selectedSpots.length} 個必去景點</span>（建議平均每天最多 3~4 個）。
+              <br /><br />
+              景點過多會導致<span className="font-bold text-slate-900">拉車時間大幅變長、景點停留時間受限</span>，影響旅遊品質。
+            </p>
+
+            <div className="flex gap-3 mt-2">
+              <button 
+                onClick={() => setShowWarningModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                 返回修改（刪減景點）
               </button>
-            ))}
+              <button 
+                onClick={executeGenerateFinal}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
+              >
+                 確定要去，強制排程
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <header className="border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-sm no-print relative z-40">
+        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
+          
+          <h1 className="text-2xl font-black cursor-pointer m-0 tracking-tight text-slate-800 dark:text-slate-100" onClick={() => setStep(0)}>
+            智遊台灣 Smart Tour
+          </h1>
+
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="text-right hidden sm:block">
+              <div className="text-xs font-bold text-slate-700 dark:text-slate-200">{user?.username}</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">{user?.email}</div>
+            </div>
             
-            <div className="mt-6 px-3">
-              <p className="text-xs text-emerald-600 dark:text-emerald-500 font-bold bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/50 leading-relaxed">
-                🚀 資料庫已開通。歷史紀錄保存功能開發中。
-              </p>
-            </div>
+            <button 
+              onClick={() => setIsThemeModalOpen(true)}
+              className="text-xl hover:scale-110 hover:rotate-90 transition-all outline-none grayscale-[0.2]"
+              title="外觀與主題設定"
+            >
+              ⚙️
+            </button>
+
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex flex-col gap-1.5 justify-center items-center h-10 w-10 outline-none"
+              title="歷史對話"
+            >
+              <span className="block h-[2px] w-5 bg-slate-800 dark:bg-slate-200"></span>
+              <span className="block h-[2px] w-5 bg-slate-800 dark:bg-slate-200"></span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onLogout}
+              className="ml-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              登出
+            </button>
           </div>
-          
-          {/* 🚀 登出按鈕 */}
-          {user && (
-            <div className="mt-auto p-4 border-t border-slate-200 dark:border-slate-800">
-              <button onClick={onLogout} className="w-full py-2.5 rounded-lg border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-sm font-bold transition-colors">
-                登出系統
-              </button>
-            </div>
-          )}
-        </aside>
-      </div>
+
+        </div>
+      </header>
 
       {/* --- 主題設定與夜間模式 Modal 彈窗 --- */}
       {isThemeModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4 animate-fadeIn no-print">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border flex flex-col gap-4">
             <div className="flex justify-between items-center mb-1">
-              <h3 className="text-lg font-extrabold text-slate-900 m-0">⚙️ 外觀與主題設定</h3>
+              <h3 className="text-lg font-extrabold text-slate-900 m-0">外觀與主題設定</h3>
               <button onClick={() => setIsThemeModalOpen(false)} className="text-slate-400 hover:text-slate-700 text-2xl font-bold leading-none">&times;</button>
             </div>
-            
             <div className="mb-2">
-              <label className="block text-xs font-bold text-slate-500 mb-2">🌗 顯示模式</label>
+              <label className="block text-xs font-bold text-slate-500 mb-2"> 顯示模式</label>
               <div className="flex gap-2">
                 <button onClick={() => setIsDarkMode(false)} className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${!isDarkMode ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>☀️ 日間</button>
                 <button onClick={() => setIsDarkMode(true)} className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${isDarkMode ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>🌙 夜間</button>
@@ -739,7 +780,7 @@ export const Dashboard = ({ user, onLogout }) => {
             <div className="h-px w-full bg-slate-100 my-1"></div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-2">🎨 主色調</label>
+              <label className="block text-xs font-bold text-slate-500 mb-2"> 主色調</label>
               <div className="grid grid-cols-1 gap-2.5">
                 {Object.entries(THEMES).map(([key, theme]) => (
                   <button
@@ -756,6 +797,8 @@ export const Dashboard = ({ user, onLogout }) => {
                   </button>
                 ))}
               </div>
+              
+              {/*  自訂圖片上傳區塊 */}
               {activeTheme === 'custom' && (
                  <div className="mt-3 p-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 text-center animate-fadeIn">
                     <input type="file" id="customBg" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -771,83 +814,78 @@ export const Dashboard = ({ user, onLogout }) => {
         </div>
       )}
 
-      {/* --- 景點過多警告 Modal 彈窗 --- */}
-      {showWarningModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border flex flex-col gap-4">
-            <div className="flex items-center gap-3 text-amber-600">
-              <span className="text-3xl">⚠️</span>
-              <h3 className="text-lg font-extrabold text-slate-900 m-0">行程可能太緊湊！</h3>
-            </div>
-            <p className="text-xs text-slate-600 bg-amber-50 border border-amber-200 p-3.5 rounded-xl">
-              您規劃了 <span className="font-extrabold">{formData.days} 天</span> 的行程，已勾選 <span className="font-extrabold">{selectedSpots.length} 個</span> 景點。過多景點會導致拉車時間變長。
-            </p>
-            <div className="flex gap-3 mt-2">
-              <button onClick={() => setShowWarningModal(false)} className="flex-1 py-2.5 rounded-xl border text-xs font-bold hover:bg-slate-100">↩️ 返回修改</button>
-              <button onClick={executeGenerateFinal} className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700">⚡ 強行排程</button>
+      {/* --- 右側 Sidebar：歷史紀錄 --- */}
+      <div className={`fixed inset-0 z-50 transition-opacity no-print ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
+        <aside className={`absolute top-0 right-0 w-72 h-full bg-slate-50 dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-800">
+            <span className="font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <span className="text-xl"></span> 歷史對話
+            </span>
+            <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 transition-colors">✕</button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-3 space-y-1">
+            <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase px-3 py-2">近期對話 (展示用)</div>
+            {[
+              '歷史紀錄保存功能還在用',
+            ].map((title, i) => (
+              <button key={i} className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors truncate">
+                💬 {title}
+              </button>
+            ))}
+            
+            <div className="mt-6 px-3">
+              <p className="text-xs text-emerald-600 dark:text-emerald-500 font-bold bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/50 leading-relaxed">
+                 資料庫已開通。歷史紀錄保存功能開發中。
+              </p>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* --- 頁首導覽列 (全部移到右邊) --- */}
-      <header className="border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-sm no-print relative z-40">
-        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-end gap-4">
-          
-          {/* 標題靠左對齊，其他元素全數靠右 */}
-          <h1 className="text-2xl font-black cursor-pointer m-0 tracking-tight text-slate-800 dark:text-slate-100 mr-auto" onClick={() => setStep(0)}>智遊台灣 Smart Tour</h1>
-
-          {/* 無框齒輪：設定與主題調色 */}
-          <button 
-            onClick={() => setIsThemeModalOpen(true)}
-            className="text-xl hover:scale-110 hover:rotate-90 transition-all outline-none grayscale-[0.2]"
-            title="外觀與主題設定"
-          >
-            ⚙️
-          </button>
-
-          {/* 兩條線：歷史紀錄選單 */}
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex flex-col gap-1.5 justify-center items-center h-10 w-10 outline-none"
-            title="歷史對話"
-          >
-            <span className="block h-[2px] w-5 bg-slate-800 dark:bg-slate-200"></span>
-            <span className="block h-[2px] w-5 bg-slate-800 dark:bg-slate-200"></span>
-          </button>
-          
-        </div>
-      </header>
+        </aside>
+      </div>
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6">
-        {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm mb-6 shadow-sm no-print">{errorMsg}</div>}
+        <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm no-print">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-bold text-emerald-600 tracking-wider">SYSTEM PROGRESS</span>
+            <span className="text-xs font-semibold text-slate-400">目前步驟：{Math.floor(step + 1)} / 7</span>
+          </div>
+          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-emerald-500 transition-all duration-500 ease-out" style={{ width: `${(step + 1) * 14.28}%` }}></div>
+          </div>
+        </div>
 
-        {step === 6 ? (           
+        {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg font-semibold text-sm mb-6 shadow-sm no-print">{errorMsg}</div>}
+
+        {step === 6 ? (
           <div className="flex flex-col gap-6 animate-fadeIn">
-            <div className="bg-white rounded-xl shadow-sm border p-4 map-section no-print">
-              <div className="flex items-baseline gap-3 mb-2">
-                <h2 className="text-base font-bold m-0 text-slate-900">📍 智慧啟程導航</h2>
-                <span className="text-xs text-slate-500 font-medium">點選更多選項可以顯示第一天行程的導航路線</span>
-              </div>
-              <div className="h-96 rounded-lg overflow-hidden border">
-                <iframe width="100%" height="100%" frameBorder="0" src={getMapSrc()} allowFullScreen title="Map"></iframe>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 map-section no-print">
+              <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（出發地 ➔ 目的地首站/搭乘處）</h2>
+              <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Navigation"></iframe>
               </div>
             </div>
-            <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border p-6 flex flex-col print-area">
-              <div className="flex justify-between items-center border-b pb-4 mb-4">
-                <h2 className="text-lg font-extrabold flex items-center gap-2 text-slate-900">專屬旅遊行程規劃表</h2>
+
+            <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col print-area">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專屬旅遊行程規劃表</h2>
                 <div className="flex gap-2 items-center">
-                  <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border">{formData.start_location} | {formData.days}天</span>
+                  <span className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
+                    出發地：{formData.start_location} | {formData.days} 天 {formData.group_size} ({isOffshoreSelected ? `外島:${formData.offshore_transit}` : formData.transport})
+                  </span>
+                  {formData.cities.map(c => <span key={c} className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-semibold">{c}</span>)}
                 </div>
               </div>
       
               <div className="mb-4 flex gap-2 justify-end no-print">
-                <button onClick={handleCopyToClipboard} className="px-4 py-2 text-xs font-bold rounded-lg border bg-white hover:bg-slate-50">{copySuccess ? "已複製" : "複製文字"}</button>
-                <button onClick={handlePrintPDF} className="px-4 py-2 text-xs font-bold rounded-lg bg-slate-800 text-white hover:bg-slate-900">匯出 PDF</button>
+                <button onClick={handleCopyToClipboard} className="px-4 py-2 text-xs font-bold rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-1.5 shadow-sm">
+                  {copySuccess ? " 已複製到剪貼簿" : " 複製文字行程"}
+                </button>
+                <button onClick={handlePrintPDF} className="px-4 py-2 text-xs font-bold rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-all flex items-center gap-1.5 shadow-sm">匯出 PDF / 列印</button>
               </div>
 
-              {/* 這裡渲染可拖曳的 Scratch 方塊 */}
-              <div className="bg-slate-50/70 rounded-xl p-8 border min-h-[450px]">
+              {/* 🚀 Scratch 拖曳方塊的 UI */}
+              <div className="bg-slate-50/70 rounded-xl p-8 border border-slate-100 min-h-[450px]">
                 {loading ? (
                   <div className="h-[350px] flex flex-col items-center justify-center">
                     <div className="flex items-center space-x-2">
@@ -877,7 +915,7 @@ export const Dashboard = ({ user, onLogout }) => {
                           <div className="flex flex-col gap-3">
                             {day.spots.map((spot, spotIndex) => (
                               <div
-                                key={spot.id}
+                                key={spot.id || spotIndex}
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, dayIndex, spotIndex)}
                                 onDragEnter={(e) => handleDragEnter(e, dayIndex, spotIndex)}
@@ -926,121 +964,295 @@ export const Dashboard = ({ user, onLogout }) => {
                 )}
               </div>
 
-              <div className="mt-6 border-t pt-5 no-print">
+              <div className="mt-6 border-t border-slate-100 pt-5 no-print">
+                <h3 className="text-sm font-bold text-slate-800 mb-2"> 對行程不滿意？你想修改哪裡：</h3>
                 <form onSubmit={handleModifyItinerary} className="flex gap-2">
-                  <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="行程修改，例如: 幫我把行程塞滿、幫我換成雨天備案" className="flex-1 text-sm rounded-xl border px-4 py-3 outline-none" />
-                  <button type="submit" disabled={loading || !userChoice.trim()} className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700">微調修改</button>
+                  <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder={loading ? "正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排鬆一點..."} className="flex-1 text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
+                  <button type="submit" disabled={loading || !userChoice.trim()} className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 shadow-md shadow-emerald-600/10 transition-all">{loading ? "修改中..." : "送出修改需求"}</button>
                 </form>
               </div>
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            
             {step === 5 ? (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[620px] lg:col-span-1 animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"> 景點推薦名單</h2>
                     {selectedSpots.length > 0 && (
-                      <span className="text-xs border px-2 py-1 rounded-md font-bold bg-emerald-50 text-emerald-700 border-emerald-200">已勾選 {selectedSpots.length} 個景點</span>
+                      <span className={`text-xs border px-2 py-1 rounded-md font-bold ${
+                        isOvercrowded 
+                          ? 'bg-amber-50 text-amber-800 border-amber-300' 
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      }`}>
+                        已勾選必去 {selectedSpots.length} 個景點
+                      </span>
                     )}
                   </div>
+
+                  {isOvercrowded && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-xs font-semibold mb-3 flex items-start gap-2 shadow-sm animate-fadeIn">
+                      <span className="text-base leading-none">⚠️</span>
+                      <div>
+                        <p className="font-extrabold text-amber-900 mb-0.5">景點數量偏多提示</p>
+                        <p className="leading-relaxed">
+                          預計旅遊天數為 <span className="font-black text-amber-950">{formData.days} 天</span>，已勾選 <span className="font-black text-amber-950">{selectedSpots.length} 個景點</span>。景點過多可能導致拉車交通時間拉長，點擊確定時系統將提供優化建議與確認。
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 tracking-wide">
                     {loading ? (
                       <div className="h-full flex flex-col items-center justify-center py-12">
-                        <div className="flex items-center space-x-1.5">
-                          <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                          <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                          <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div>
-                        </div>
+                        <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div></div>
                         <p className="text-xs font-semibold text-emerald-600 mt-4">正在調度數據...</p>
+                      </div>
+                    ) : currentPagedSpots.length === 0 ? (
+                      <div className="text-center py-12 text-slate-400 text-xs italic">
+                        未偵測到景點...
+                        <div className="text-left mt-4 not-italic text-slate-700 whitespace-pre-line">
+                          {spotsRecommendation}
+                        </div>
                       </div>
                     ) : (
                       <div className="space-y-3">
                         {currentPagedSpots.map((spot, idx) => {
                           const isChecked = selectedSpots.includes(spot.title);
                           return (
-                            <div key={idx} className={`p-3.5 rounded-xl border flex flex-col gap-2 ${isChecked ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 hover:bg-slate-100'}`}>
-                              <div className="flex items-center justify-between">
-                                <label className="flex items-center gap-2.5 cursor-pointer font-extrabold text-slate-900 text-sm">
-                                  <input type="checkbox" checked={isChecked} onChange={() => handleToggleSpotCheckbox(spot.title)} className="w-4 h-4 rounded text-emerald-600 cursor-pointer" />
-                                  {spot.title}
-                                </label>
-                                <button type="button" onClick={() => setMapQuery(spot.title)} className="px-2.5 py-1 text-[11px] font-bold text-white bg-slate-800 rounded-lg">定位</button>
+                            <div 
+                              key={idx} 
+                              className={`p-3.5 rounded-xl transition-all shadow-none flex flex-col gap-2 ${
+                                isChecked 
+                                  ? 'bg-emerald-50 border border-emerald-50' 
+                                  : 'bg-slate-100/70 border border-slate-100 hover:bg-slate-200/50'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2.5">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={isChecked}
+                                    onChange={() => handleToggleSpotCheckbox(spot.title)}
+                                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                                  />
+                                  <h3 className="text-sm font-extrabold text-slate-900 m-0 flex items-center gap-1.5 cursor-pointer select-none" onClick={() => handleToggleSpotCheckbox(spot.title)}>
+                                    <span className="bg-slate-200/80 text-slate-700 px-1.5 py-0.5 rounded text-[10px]">#{((currentPage - 1) * spotsPerPage) + idx + 1}</span> {spot.title}
+                                  </h3>
+                                </div>
+                                <button 
+                                  type="button"
+                                  onClick={() => setMapQuery(spot.title)}
+                                  className="px-2.5 py-1 text-[11px] font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap"
+                                >
+                                  定位
+                                </button>
                               </div>
-                              <div className="text-xs text-slate-600 pl-6"><ReactMarkdown>{spot.rawMarkdown}</ReactMarkdown></div>
+                              <div className="text-xs text-slate-600 leading-snug space-y-0.5 prose prose-sm max-w-none prose-p:my-0.5 prose-p:leading-snug prose-strong:text-slate-800 pl-6">
+                                <ReactMarkdown>{spot.rawMarkdown}</ReactMarkdown>
+                              </div>
                             </div>
                           );
                         })}
                       </div>
                     )}
                   </div>
+
                   {!loading && totalPages > 1 && (
-                    <div className="flex justify-center gap-2 mt-4 pt-3 border-t">
-                      <button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1} className="px-2.5 py-1 text-xs font-semibold border rounded bg-white disabled:opacity-40">上一頁</button>
-                      <span className="text-xs font-bold text-slate-500 px-2">頁次 {currentPage} / {totalPages}</span>
-                      <button onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages} className="px-2.5 py-1 text-xs font-semibold border rounded bg-white disabled:opacity-40">下一頁</button>
+                    <div className="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-slate-100 no-print">
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="px-2.5 py-1 text-xs font-semibold rounded border border-slate-200 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+                      >
+                        上一頁
+                      </button>
+                      <span className="text-xs font-bold text-slate-500 px-2">
+                        頁次 {currentPage} / {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="px-2.5 py-1 text-xs font-semibold rounded border border-slate-200 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+                      >
+                        下一頁
+                      </button>
                     </div>
                   )}
                 </div>
-                <div className="flex justify-between border-t pt-4 mt-4">
-                  <button onClick={() => setStep(4)} className="px-5 py-2 rounded-xl border text-sm font-medium hover:bg-slate-50">重新規劃</button>
-                  <button onClick={handleConfirmAndGenerateFinal} className="px-6 py-2.5 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">排定路線</button>
+
+                <div className="flex justify-between border-t border-slate-100 pt-4 mt-4">
+                  <button onClick={() => setStep(4)} className="px-5 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-500 hover:bg-slate-50 transition-colors">重新規劃</button>
+                  <button onClick={handleConfirmAndGenerateFinal} className="px-6 py-2.5 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm">確定選好了！排定最優路線</button>
                 </div>
               </section>
             ) : (
-               <section className="bg-white rounded-xl shadow-sm border p-5 flex flex-col justify-between min-h-[460px]">
-                  {step === 0 && (
-                     <div className="flex-1 flex flex-col justify-between">
-                        <div>
-                           <h2 className="text-base font-bold mb-4 text-slate-900">第一步：你的出發地在哪裡？</h2>
-                           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[320px]">
-                           {Object.keys(TAIWAN_DISTRICTS).map(city => (
-                              <div key={city} onClick={() => { setSelectedCity(city); setSelectedDistrict(""); }} className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border ${selectedCity === city ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>{city}</div>
-                           ))}
-                           </div>
-                        </div>
-                        <div className="flex justify-end mt-4"><button onClick={() => setStep(1)} disabled={!selectedCity} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white disabled:bg-slate-300">下一步</button></div>
-                     </div>
-                  )}
-                  {step === 1 && (
-                     <div className="flex-1 flex flex-col justify-between">
-                        <div className="space-y-4">
-                           <h2 className="text-base font-bold text-slate-900">第二步：選擇詳細出發位置</h2>
-                           {selectedCity && (
-                              <div className="grid grid-cols-3 gap-2 overflow-y-auto max-h-[180px]">
-                                 {TAIWAN_DISTRICTS[selectedCity].map(dist => (
-                                    <div key={dist} onClick={() => setSelectedDistrict(dist)} className={`py-2 text-center rounded-lg cursor-pointer text-xs font-medium border ${selectedDistrict === dist ? 'bg-emerald-100 text-emerald-800 font-bold' : 'bg-slate-50 hover:bg-slate-100'}`}>{dist}</div>
-                                 ))}
+              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
+                {/* 第一步：僅選擇出發縣市 */}
+                {step === 0 && (
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div className="space-y-4 animate-fadeIn">
+                      <h2 className="text-base font-bold text-slate-900 mb-1">第一步：你的出發地在哪裡？</h2>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-2">選擇出發縣市</label>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[320px] pr-1">
+                          {Object.keys(TAIWAN_DISTRICTS).map(city => {
+                            const isSelected = selectedCity === city;
+                            return (
+                              <div 
+                                key={city} 
+                                onClick={() => { 
+                                  setSelectedCity(city); 
+                                  setSelectedDistrict(""); 
+                                }} 
+                                className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm font-bold' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}
+                              >
+                                {city}
                               </div>
-                           )}
-                           <input type="text" value={detailRoad} onChange={(e) => setDetailRoad(e.target.value)} placeholder="輸入詳細道路/地標" className="w-full text-xs rounded-xl border px-3 py-2.5 outline-none" />
-                           <input type="time" value={formData.start_time} onChange={(e) => setFormData({ ...formData, start_time: e.target.value })} className="w-full text-xs rounded-xl border px-3 py-2.5 outline-none cursor-pointer" />
+                            );
+                          })}
                         </div>
-                        <div className="flex justify-between mt-4"><button onClick={() => setStep(0)} className="px-5 py-2 rounded-lg border">上一步</button><button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg bg-emerald-600 text-white font-bold">下一步</button></div>
-                     </div>
-                  )}
-                  {step === 2 && (
-                     <div className="flex-1 flex flex-col justify-between">
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end mt-4">
+                      <button 
+                        onClick={() => setStep(1)} 
+                        disabled={!selectedCity}
+                        className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all disabled:bg-slate-300 disabled:cursor-not-allowed"
+                      >
+                        下一步
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 第二步：選擇行政區與詳細路段 */}
+                {step === 1 && (
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div className="space-y-4 animate-fadeIn">
+                      <h2 className="text-base font-bold text-slate-900 mb-1">第二步：選擇詳細出發位置</h2>
+                      
+                      {selectedCity && TAIWAN_DISTRICTS[selectedCity] && (
                         <div>
-                           <h2 className="text-base font-bold text-slate-900">第三步：你想去哪些目的地玩？</h2>
-                           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px]">
-                           {["基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣", "澎湖縣", "金門縣", "連江縣"].map(city => (
-                              <div key={city} onClick={() => handleCheckboxChange('cities', city)} className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border ${formData.cities.includes(city) ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-50 hover:bg-slate-100'}`}>{city}</div>
-                           ))}
-                           </div>
+                          <label className="block text-xs font-bold text-slate-500 mb-2">選擇行政區（{selectedCity}）</label>
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[180px] pr-1">
+                            {TAIWAN_DISTRICTS[selectedCity].map(dist => {
+                              const isSelected = selectedDistrict === dist;
+                              return (
+                                <div 
+                                  key={dist} 
+                                  onClick={() => setSelectedDistrict(dist)} 
+                                  className={`py-2 text-center rounded-lg cursor-pointer text-xs font-medium border transition-all select-none ${isSelected ? 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                                >
+                                  {dist}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div className="flex justify-between mt-4"><button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg border">上一步</button><button onClick={() => setStep(isOffshoreSelected ? 2.5 : 3)} className="px-5 py-2 rounded-lg bg-emerald-600 text-white font-bold">下一步</button></div>
-                     </div>
-                  )}
-                  {step === 2.5 && (
-                     <div className="flex-1 flex flex-col justify-between">
-                        <div><h2 className="text-base font-bold text-slate-900">選擇離島交通</h2><div className="grid grid-cols-2 gap-4 mt-6"><div onClick={() => setFormData({ ...formData, offshore_transit: '飛機' })} className={`p-5 rounded-2xl border-2 cursor-pointer text-center ${formData.offshore_transit === '飛機' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>✈️ 飛機</div><div onClick={() => setFormData({ ...formData, offshore_transit: '輪船' })} className={`p-5 rounded-2xl border-2 cursor-pointer text-center ${formData.offshore_transit === '輪船' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>🚢 輪船</div></div></div>
-                        <div className="flex justify-between mt-6"><button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg border">上一步</button><button onClick={() => setStep(3)} className="px-5 py-2 rounded-lg bg-emerald-600 text-white font-bold">下一步</button></div>
-                     </div>
-                  )}
-                 {/* 第四步：天數與偏好設定 */}
+                      )}
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">輸入詳細道路/地標（選填）</label>
+                        <input 
+                          type="text"
+                          value={detailRoad}
+                          onChange={(e) => setDetailRoad(e.target.value)}
+                          placeholder="例如：台北車站、大坪林、二十張路..."
+                          className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
+                        />
+                      </div>
+
+                      <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100 text-center">
+                        <span className="text-[11px] text-slate-400 block font-semibold">即時預估出發地：</span>
+                        <span className="text-xs font-extrabold text-emerald-700">
+                          {selectedCity}{selectedDistrict}{detailRoad || "(未輸入詳細路段)"}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between mt-4">
+                      <button onClick={() => setStep(0)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
+                      <button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all">下一步</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 第三步：選擇目的地 */}
+                {step === 2 && (
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900 mb-1">第三步：你想去哪些目的地玩？（可複選）</h2>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px] pr-1">
+                        {["基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣", "澎湖縣", "金門縣", "連江縣"].map(city => {
+                          const isSelected = formData.cities.includes(city);
+                          return (
+                            <div key={city} onClick={() => handleCheckboxChange('cities', city)} className={`py-2.5 text-center rounded-lg cursor-pointer text-xs font-semibold border transition-all select-none ${isSelected ? 'bg-emerald-600 text-white border-emerald-700 shadow-md font-bold' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}>{city}</div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="flex justify-between mt-4">
+                      <button onClick={() => setStep(1)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
+                      <button 
+                        onClick={() => setStep(isOffshoreSelected ? 2.5 : 3)} 
+                        className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all"
+                      >
+                        下一步
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 🚀 外島專用加頁：選擇跨海交通方式 */}
+                {step === 2.5 && (
+                  <div className="flex-1 flex flex-col justify-between animate-fadeIn">
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900 mb-1">選擇離島跨海交通方式</h2>
+                      <p className="text-xs text-slate-500 mb-4">
+                        偵測到您選擇了離島目的地（<span className="font-bold text-emerald-700">{formData.cities.filter(c => OFFSHORE_ISLANDS.some(i => c.includes(i))).join('、')}</span>），請選擇您預計採用的跨海交通方式：
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-4 mt-6">
+                        <div 
+                          onClick={() => setFormData({ ...formData, offshore_transit: '飛機' })}
+                          className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col items-center gap-2 ${
+                            formData.offshore_transit === '飛機'
+                              ? 'border-emerald-500 bg-emerald-50/60 shadow-md'
+                              : 'border-slate-200 bg-slate-50 hover:bg-slate-100/80'
+                          }`}
+                        >
+                          <span className="text-4xl">✈️</span>
+                          <span className="text-sm font-extrabold text-slate-800">搭乘飛機</span>
+                          <span className="text-[11px] text-slate-500 text-center">快速省時，導航將自動引導至本島機場</span>
+                        </div>
+
+                        <div 
+                          onClick={() => setFormData({ ...formData, offshore_transit: '輪船' })}
+                          className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col items-center gap-2 ${
+                            formData.offshore_transit === '輪船'
+                              ? 'border-emerald-500 bg-emerald-50/60 shadow-md'
+                              : 'border-slate-200 bg-slate-50 hover:bg-slate-100/80'
+                          }`}
+                        >
+                          <span className="text-4xl">🚢</span>
+                          <span className="text-sm font-extrabold text-slate-800">搭乘輪船</span>
+                          <span className="text-[11px] text-slate-500 text-center">悠閒渡輪，導航將自動引導至出海港口碼頭</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between mt-6">
+                      <button onClick={() => setStep(2)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
+                      <button onClick={() => setStep(3)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-all">下一步</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 第四步：天數與偏好設定 */}
                 {step === 3 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
@@ -1088,6 +1300,7 @@ export const Dashboard = ({ user, onLogout }) => {
                     </div>
                   </div>
                 )}
+
                 {/* 第五步：成員設定 */}
                 {step === 4 && (
                   <div className="flex-1 flex flex-col justify-between">
@@ -1099,25 +1312,65 @@ export const Dashboard = ({ user, onLogout }) => {
                     <div className="flex justify-between mt-6"><button onClick={() => setStep(3)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button><button onClick={handleRecommendSpots} disabled={!formData.group_size || formData.group_size.trim() === ''} className={`px-5 py-2 rounded-lg text-sm font-bold text-white transition-colors ${(!formData.group_size || formData.group_size.trim() === '') ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}>開始海選景點！</button></div>
                   </div>
                 )}
-               </section>
+              </section>
             )}
 
             {step === 5 ? (
               <section className="flex flex-col gap-6 lg:col-span-1 animate-fadeIn lg:sticky lg:top-6 no-print">
-                <div className="bg-white rounded-xl shadow-sm border p-4"><h2 className="text-xs font-bold text-slate-400 mb-2">區域地圖智慧導航</h2><div className="h-[240px] rounded-xl overflow-hidden border"><iframe width="100%" height="100%" frameBorder="0" src={getMapSrc()} allowFullScreen></iframe></div></div>
-                <div className="bg-white rounded-xl shadow-sm border p-5 flex flex-col gap-4">
-                  <div><h2 className="text-base font-bold text-slate-900">偏好意見調整</h2><p className="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border">{apiMsg}</p></div>
-                  <form onSubmit={handleAnalyzeSelection} className="flex gap-2">
-                    <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="某些景點不要去..." className="flex-1 text-xs rounded-xl border px-4 py-3 outline-none" />
-                    <button type="submit" disabled={loading || !userChoice.trim()} className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-800">送出意見</button>
-                  </form>
+                <div className="bg-white rounded-xl shadow-sm border p-4">
+                  <h2 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">區域地圖智慧導航</h2>
+                  <div className="h-[240px] rounded-xl overflow-hidden border border-slate-100">
+                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Live Map Preview"></iframe>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col gap-4">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 mb-1">偏好意見調整</h2>
+                    <p className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100/70">{apiMsg || "請檢閱左側 AI 智慧決策建議名單。"}</p>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <form onSubmit={handleAnalyzeSelection} className="flex gap-2">
+                      <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder="例如：某些景點不要去、加入特定新景點..." className="flex-1 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
+                      <button type="submit" disabled={loading || !userChoice.trim()} className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 transition-colors">送出意見</button>
+                    </form>
+
+                    {accumulatedSpots && accumulatedSpots.trim() !== "" && (
+                      <div className="mt-1">
+                        <span className="block text-[11px] font-semibold text-slate-400 mb-1.5">已提交的變更需求紀錄：</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {accumulatedSpots.split('+').map((opinion, idx) => {
+                            const cleanOpinion = opinion.trim();
+                            if (!cleanOpinion) return null;
+                            return <span key={idx} className="inline-flex items-center bg-slate-50 text-slate-600 text-[11px] px-2.5 py-1 rounded-lg border border-slate-200/60 shadow-2xs font-medium">🎯 {cleanOpinion}</span>;
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </section>
             ) : (
               <section className="flex flex-col gap-4 no-print">
-                <div className="bg-white rounded-xl shadow-sm border p-4 lg:p-5 flex-1 flex flex-col"><h2 className="text-base font-bold text-slate-900">區域地圖智慧導航</h2><div className="mt-2 h-[460px] rounded-lg overflow-hidden border bg-slate-50"><iframe width="100%" height="100%" frameBorder="0" src={getMapSrc()} allowFullScreen></iframe></div></div>
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5 flex-1 flex flex-col">
+                  <h2 className="text-base font-bold text-slate-900 mb-1">區域地圖智慧導航（動態路線預覽）</h2>
+                  <div className="mt-2 h-[460px] rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                    <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Initial Map Preview"></iframe>
+                  </div>
+                </div>
+
+                {step > 1 && (
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5 flex-1 flex flex-col animate-fadeIn">
+                    <h2 className="text-base font-bold text-slate-900 mb-2">智慧旅遊決策建議</h2>
+                    <div className="flex-1 bg-slate-50/70 rounded-xl p-4 border border-slate-100 min-h-[260px] max-h-[360px] overflow-y-auto text-sm text-slate-700 flex items-center justify-center">
+                      <p className="text-slate-400 text-xs text-center italic">尚未產生建議，請先在左側面板完成偏好設定。</p>
+                    </div>
+                  </div>
+                )}
               </section>
             )}
+
           </div>
         )}
       </main>

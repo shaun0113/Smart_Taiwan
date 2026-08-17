@@ -106,7 +106,7 @@ def get_db():
 
 
 def init_database() -> None:
-    """只在 Railway 建立登入系統所需的 users 資料表。"""
+    """只在 Railway 建立登入系統所需的 users 資料表與 itineraries 行程表。"""
     with get_auth_db() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -123,6 +123,23 @@ def init_database() -> None:
                     PRIMARY KEY (id),
                     UNIQUE KEY uq_users_username (username),
                     UNIQUE KEY uq_users_email (email)
+                ) ENGINE=InnoDB
+                  DEFAULT CHARSET=utf8mb4
+                  COLLATE=utf8mb4_unicode_ci
+                """
+            )
+            
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS itineraries (
+                    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                    user_id BIGINT UNSIGNED NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    itinerary_data JSON NOT NULL,
+                    form_data JSON NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    CONSTRAINT fk_itineraries_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 ) ENGINE=InnoDB
                   DEFAULT CHARSET=utf8mb4
                   COLLATE=utf8mb4_unicode_ci
