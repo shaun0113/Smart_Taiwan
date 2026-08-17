@@ -35,7 +35,6 @@ export function AuthPage({ onAuthenticated }) {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl p-7">
         <div className="text-center mb-7">
-          <div className="text-4xl mb-3">🧭</div>
           <h1 className="text-2xl font-extrabold text-slate-900">智遊台灣</h1>
           <p className="text-sm text-slate-500 mt-2">登入後開始建立你的專屬旅遊行程</p>
         </div>
