@@ -1,7 +1,7 @@
 import os
 import json 
-#import smtplib
-#import random
+import smtplib
+import random
 from fastapi import FastAPI, HTTPException, Depends 
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel

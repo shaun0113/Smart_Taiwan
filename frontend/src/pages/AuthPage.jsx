@@ -8,15 +8,16 @@ const API_BASE_URL = window.location.hostname === 'localhost' || window.location
 
 export function AuthPage({ onAuthenticated }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register' | 'forgot'
-  const [form, setForm] = useState({ username: '', email: '', password: '', confirmPassword: '' });
+  const [form, setForm] = useState({ username: '', email: '', password: '', confirmPassword: '', otp: '' });
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  const [countdown, setCountdown] = useState(0);
 
   const isRegister = mode === 'register';
   const isForgot = mode === 'forgot';
 
-  // 1. 初始化載入 Google Script
   useEffect(() => {
     if (!document.getElementById('google-client-script')) {
       const script = document.createElement('script');
@@ -28,7 +29,6 @@ export function AuthPage({ onAuthenticated }) {
     }
   }, []);
 
-  // 2. 當切換回登入模式時，自動重新渲染 Google 按鈕
   useEffect(() => {
     if (mode !== 'login') return;
 
@@ -74,6 +74,41 @@ export function AuthPage({ onAuthenticated }) {
     renderGoogleButton();
   }, [mode, onAuthenticated]);
 
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
+
+  const handleSendOtp = async () => {
+    if (!form.email) {
+      setError('請先輸入電子郵件信箱，才能發送驗證碼');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg('驗證碼已發送至您的信箱！請在 5 分鐘內輸入。');
+        setCountdown(60); 
+      } else {
+        setError(data.detail || '驗證碼發送失敗');
+      }
+    } catch (e) {
+      setError('無法連線至伺服器，發送失敗');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
@@ -91,7 +126,7 @@ export function AuthPage({ onAuthenticated }) {
         const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: form.email, new_password: form.password })
+          body: JSON.stringify({ email: form.email, new_password: form.password, otp: form.otp })
         });
         const data = await res.json();
 
@@ -100,7 +135,7 @@ export function AuthPage({ onAuthenticated }) {
           setTimeout(() => {
             setMode('login');
             setSuccessMsg('');
-            setForm({ username: '', email: '', password: '', confirmPassword: '' });
+            setForm({ username: '', email: '', password: '', confirmPassword: '', otp: '' });
           }, 1500);
         } else {
           setError(data.detail || '重設失敗');
@@ -108,7 +143,7 @@ export function AuthPage({ onAuthenticated }) {
       } else {
         const endpoint = isRegister ? `${API_BASE_URL}/api/auth/register` : `${API_BASE_URL}/api/auth/login`;
         const payload = isRegister 
-          ? { username: form.username, email: form.email, password: form.password }
+          ? { username: form.username, email: form.email, password: form.password, otp: form.otp }
           : { email: form.email, password: form.password };
 
         const res = await fetch(endpoint, {
@@ -136,13 +171,15 @@ export function AuthPage({ onAuthenticated }) {
     setMode(nextMode);
     setError('');
     setSuccessMsg('');
-    setForm({ username: '', email: '', password: '', confirmPassword: '' });
+    setCountdown(0);
+    setForm({ username: '', email: '', password: '', confirmPassword: '', otp: '' });
   }
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl p-7">
         <div className="text-center mb-7">
+          <div className="text-4xl mb-3">🧭</div>
           <h1 className="text-2xl font-extrabold text-slate-900">智遊台灣</h1>
           <p className="text-sm text-slate-500 mt-2">
             {isForgot ? '重設您的帳號密碼' : '登入後開始建立你的專屬旅遊行程'}
@@ -197,6 +234,31 @@ export function AuthPage({ onAuthenticated }) {
             />
           </div>
 
+          {(isRegister || isForgot) && (
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">驗證碼</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={form.otp}
+                  onChange={(e) => setForm({ ...form, otp: e.target.value })}
+                  maxLength={6}
+                  required
+                  className="flex-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-500 font-mono tracking-widest"
+                  placeholder="輸入6位數驗證碼"
+                />
+                <button
+                  type="button"
+                  onClick={handleSendOtp}
+                  disabled={countdown > 0 || loading}
+                  className="px-4 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-200 disabled:opacity-50 transition-colors whitespace-nowrap"
+                >
+                  {countdown > 0 ? `${countdown} 秒後重發` : '取得驗證碼'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">
               {isForgot ? '新密碼' : '密碼'}
@@ -205,7 +267,7 @@ export function AuthPage({ onAuthenticated }) {
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              minLength={8}
+              minLength={isRegister || isForgot ? 8 : 1}
               maxLength={72}
               required
               className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-500"
@@ -246,7 +308,7 @@ export function AuthPage({ onAuthenticated }) {
             disabled={loading}
             className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-3 transition"
           >
-            {loading ? '處理中…' : isForgot ? '確認重設密碼' : isRegister ? '建立帳號' : '登入系統'}
+            {loading ? '處理中…' : isForgot ? '確認重設密碼' : isRegister ? '驗證並建立帳號' : '登入系統'}
           </button>
         </form>
 

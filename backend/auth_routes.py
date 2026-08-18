@@ -27,7 +27,6 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=72)
 
-# 🚀 發送 OTP 驗證碼 API
 @router.post("/send-otp") 
 def send_otp(req: OTPRequest):
     email = req.email.lower().strip()
@@ -57,7 +56,6 @@ def register(req: RegisterRequest):
     email = req.email.lower().strip()
     username = req.username.strip()
 
-    # 🚀 驗證碼檢查邏輯
     otp_record = OTP_STORE.get(email)
     if not otp_record:
         raise HTTPException(status_code=400, detail="請先獲取驗證碼")
@@ -66,7 +64,6 @@ def register(req: RegisterRequest):
     if otp_record["otp"] != req.otp:
         raise HTTPException(status_code=400, detail="驗證碼錯誤")
         
-    # 驗證成功，清除該信箱的驗證碼紀錄
     del OTP_STORE[email]
 
     with get_auth_db() as connection:
@@ -176,7 +173,7 @@ class ChangePasswordRequest(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
     new_password: str = Field(min_length=8, max_length=72)
-    otp: str  # 🚀 新增驗證碼欄位
+    otp: str  
 
 
 @router.post("/change-password")
@@ -204,7 +201,6 @@ def change_password(req: ChangePasswordRequest, current_user=Depends(get_current
 def forgot_password(req: ForgotPasswordRequest):
     email = req.email.lower().strip()
     
-    # 🚀 驗證碼檢查邏輯
     otp_record = OTP_STORE.get(email)
     if not otp_record:
         raise HTTPException(status_code=400, detail="請先獲取驗證碼")
@@ -213,7 +209,6 @@ def forgot_password(req: ForgotPasswordRequest):
     if otp_record["otp"] != req.otp:
         raise HTTPException(status_code=400, detail="驗證碼錯誤")
         
-    # 驗證成功，清除該信箱的驗證碼紀錄
     del OTP_STORE[email]
 
     with get_auth_db() as connection:
