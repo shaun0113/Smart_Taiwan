@@ -310,27 +310,7 @@ export function AuthPage({ onAuthenticated }) {
             {loading ? '處理中…' : isForgot ? '確認重設密碼' : isRegister ? '驗證並建立帳號' : '登入系統'}
           </button>
         </form>
-
-        <div className="flex justify-between items-center mt-4 text-sm font-bold">
-          {isForgot ? (
-            <button
-              type="button"
-              onClick={() => switchMode('login')}
-              className="w-full text-center text-emerald-600 hover:text-emerald-700"
-            >
-              ← 返回登入
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => switchMode('forgot')}
-              className="text-slate-400 hover:text-slate-600 text-xs"
-            >
-              忘記密碼？
-            </button>
-          )}
-        </div>
-
+        
         {!isForgot && (
           <>
             <div className="flex items-center my-6">

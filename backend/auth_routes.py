@@ -35,26 +35,41 @@ def send_otp(req: OTPRequest):
     
     OTP_STORE[email] = {"otp": otp_code, "expires": expire_time}
 
-    url = "https://api.brevo.com/v3/smtp/email"
-    headers = {
-        "accept": "application/json",
-        "api-key": os.getenv("BREVO_API_KEY"),
-        "content-type": "application/json"
-    }
-    payload = {
-        "sender": {"name": "智遊台灣 Smart Tour", "email": "shaun13@gmail.com"}, # 替換信箱
-        "to": [{"email": email}],
-        "subject": "智遊台灣 - 帳號驗證碼",
-        "htmlContent": f"<h3>歡迎使用智遊台灣 Smart Tour！</h3><p>您的驗證碼為：<strong>{otp_code}</strong></p><p>此驗證碼將於 5 分鐘後失效，請勿將驗證碼外洩給他人。</p>"
-    }
+    print(f"\n================================")
+    print(f"【專題測試】發送驗證碼至 {email}")
+    print(f"【驗證碼】: {otp_code}")
+    print(f"================================\n")
 
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        response.raise_for_status()
-        return {"msg": "驗證碼發送成功"}
-    except Exception as e:
-        print(f"Brevo API 發信失敗: {e}")
-        raise HTTPException(status_code=500, detail="驗證碼寄送失敗，請確認 API Key 是否正確")
+    return {"msg": "驗證碼已發送至您的信箱"}
+
+# @router.post("/send-otp") 
+# def send_otp(req: OTPRequest):
+    # email = req.email.lower().strip()
+    # otp_code = str(random.randint(100000, 999999))
+    # expire_time = datetime.now() + timedelta(minutes=5)
+    # 
+    # OTP_STORE[email] = {"otp": otp_code, "expires": expire_time}
+# 
+    # url = "https://api.brevo.com/v3/smtp/email"
+    # headers = {
+        # "accept": "application/json",
+        # "api-key": os.getenv("BREVO_API_KEY"),
+        # "content-type": "application/json"
+    # }
+    # payload = {
+        # "sender": {"name": "智遊台灣 Smart Tour", "email": "shaun13@gmail.com"}, # 替換信箱
+        # "to": [{"email": email}],
+        # "subject": "智遊台灣 - 帳號驗證碼",
+        # "htmlContent": f"<h3>歡迎使用智遊台灣 Smart Tour！</h3><p>您的驗證碼為：<strong>{otp_code}</strong></p><p>此驗證碼將於 5 分鐘後失效，請勿將驗證碼外洩給他人。</p>"
+    # }
+# 
+    # try:
+        # response = requests.post(url, json=payload, headers=headers)
+        # response.raise_for_status()
+        # return {"msg": "驗證碼發送成功"}
+    # except Exception as e:
+        # print(f"Brevo API 發信失敗: {e}")
+        # raise HTTPException(status_code=500, detail="驗證碼寄送失敗，請確認 API Key 是否正確")
 
 @router.post("/register", status_code=201)
 def register(req: RegisterRequest):
