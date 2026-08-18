@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://127.0.0.1:8000'
+  : 'https://smart-taiwan.onrender.com';
+
 const THEMES = {
   emerald: {
     name: '森林',
@@ -155,7 +159,7 @@ export const Dashboard = ({ user, onLogout }) => {
           const token = localStorage.getItem('token') || localStorage.getItem('access_token');
           if (!token) return;
 
-          const res = await fetch('http://127.0.0.1:8000/api/v1/itineraries', {
+          const res = await fetch(`${API_BASE_URL}/api/v1/itineraries`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const data = await res.json();
@@ -336,7 +340,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setCurrentPage(1);
       setSelectedSpots([]); 
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/recommend-spots', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/recommend-spots`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -359,7 +363,7 @@ export const Dashboard = ({ user, onLogout }) => {
         setStep(4);
       }
     } catch (error) {
-      setErrorMsg("景點海選連線失敗，請確認本地端服務是否正常啟動。");
+      setErrorMsg("景點海選連線失敗，請確認後端服務是否正常運作。");
       setStep(4);
     } finally {
       setLoading(false);
@@ -375,7 +379,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setErrorMsg("");
       setMapQuery(userChoice);
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/analyze-selection', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/analyze-selection`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -395,7 +399,7 @@ export const Dashboard = ({ user, onLogout }) => {
         setErrorMsg(`意見微調失敗：${data.detail || JSON.stringify(data)}`);
       }
     } catch (error) {
-      setErrorMsg("微調意見發送失敗，請檢查本地端連線。");
+      setErrorMsg("微調意見發送失敗，請檢查後端連線。");
     } finally {
       setLoading(false);
     }
@@ -444,7 +448,7 @@ export const Dashboard = ({ user, onLogout }) => {
         form_data: formData
       };
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/itineraries', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/itineraries`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -482,7 +486,7 @@ export const Dashboard = ({ user, onLogout }) => {
       const token = localStorage.getItem('token') || localStorage.getItem('access_token');
       if (!token) return;
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/itineraries', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/itineraries`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -539,7 +543,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setLoading(true);
       setErrorMsg("");
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/generate-final', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/generate-final`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -586,7 +590,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setErrorMsg("");
       setMapQuery(userChoice);
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/modify-itinerary', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/modify-itinerary`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -805,7 +809,7 @@ export const Dashboard = ({ user, onLogout }) => {
           header, .mb-6, iframe, h2, .no-print, form, h3, .mt-6, .map-section { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
           main { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
           .print-area { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
-          .bg-slate-50\\/70 { background: transparent !important; border: none !important; padding: 0 !important; }
+          .bg-slate-50\\/70 { background: transparent !important; border: none !important; padding: 0 !important; margin: 0 !important; }
         }
       `}</style>
 
@@ -981,8 +985,8 @@ export const Dashboard = ({ user, onLogout }) => {
         </aside>
       </div>
 
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6">
-        <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm no-print">
+      <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-6">
+        <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm no-print max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-2">
             <span className="text-xs font-bold text-emerald-600 tracking-wider">SYSTEM PROGRESS</span>
             <span className="text-xs font-semibold text-slate-400">目前步驟：{Math.floor(step + 1)} / 7</span>
@@ -992,10 +996,10 @@ export const Dashboard = ({ user, onLogout }) => {
           </div>
         </div>
 
-        {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg font-semibold text-sm mb-6 shadow-sm no-print">{errorMsg}</div>}
+        {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg font-semibold text-sm mb-6 shadow-sm no-print max-w-6xl mx-auto">{errorMsg}</div>}
 
         {step === 6 ? (
-          <div className="flex flex-col gap-6 animate-fadeIn">
+          <div className="flex flex-col gap-6 animate-fadeIn max-w-6xl mx-auto">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 map-section no-print">
               <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（點擊更多選項可以看第一天所有行程導航圖）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
@@ -1104,7 +1108,7 @@ export const Dashboard = ({ user, onLogout }) => {
                 <div className="flex-1 w-full">
                   <h3 className="text-sm font-bold text-slate-800 mb-2"> 對行程不滿意？你想修改哪裡：</h3>
                   <form onSubmit={handleModifyItinerary} className="flex gap-2">
-                    <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder={loading ? "正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排多一點、雨天備案..."} className="flex-1 text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
+                    <input type="text" value={userChoice} onChange={(e) => setUserChoice(e.target.value)} disabled={loading} placeholder={loading ? "正在重新規劃行程中..." : "例如: 第二天下午改去大稻埕、行程排鬆一點..."} className="flex-1 text-sm rounded-xl border border-slate-300 bg-white text-slate-800 px-4 py-3 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner" />
                     <button type="submit" disabled={loading || !userChoice.trim()} className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 shadow-md shadow-emerald-600/10 transition-all">{loading ? "修改中..." : "送出修改需求"}</button>
                   </form>
                 </div>
