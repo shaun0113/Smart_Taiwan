@@ -1,10 +1,14 @@
 import os
 import json 
+#import smtplib
+#import random
 from fastapi import FastAPI, HTTPException, Depends 
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any 
 from dotenv import load_dotenv
+from email.mime.text import MIMEText
+from datetime import datetime, timedelta
 
 from smart_tour_engine import SmartTourEngine
 from auth_routes import router as auth_router
@@ -143,6 +147,7 @@ def save_itinerary(itinerary: ItineraryCreate, current_user: dict = Depends(get_
                 )
             )
     return {"status": "success", "msg": "行程已儲存至雲端"}
+
 @app.get("/api/v1/itineraries")
 def get_user_itineraries(current_user: dict = Depends(get_current_user)):
     with get_auth_db() as db:

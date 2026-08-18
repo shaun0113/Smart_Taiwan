@@ -3,28 +3,71 @@ from pydantic import BaseModel, EmailStr, Field
 
 from auth import create_access_token, get_current_user, hash_password, verify_password
 from database import get_auth_db
-from pydantic import BaseModel
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+import smtplib
+from email.mime.text import MIMEText
+import random
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
+OTP_STORE = {}
+
+class OTPRequest(BaseModel):
+    email: EmailStr
 
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=2, max_length=50)
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
-
+    otp: str  
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=72)
+
+# 🚀 發送 OTP 驗證碼 API
+@router.post("/send-otp") 
+def send_otp(req: OTPRequest):
+    email = req.email.lower().strip()
+    otp_code = str(random.randint(100000, 999999))
+    expire_time = datetime.now() + timedelta(minutes=5)
+    
+    OTP_STORE[email] = {"otp": otp_code, "expires": expire_time}
+
+    msg = MIMEText(f"歡迎使用智遊台灣 Smart Tour！\n\n您的驗證碼為：{otp_code}\n此驗證碼將於 5 分鐘後失效，請勿將驗證碼外洩給他人。")
+    msg["Subject"] = "智遊台灣 - 帳號驗證碼"
+    msg["From"] = "shaunshih13@gmail.com" 
+    msg["To"] = email
+
+    try:
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        server.login("shaunshih13@gmail.com", "ykyq rapk myqy nddw") 
+        server.send_message(msg)
+        server.quit()
+        return {"msg": "驗證碼發送成功"}
+    except Exception as e:
+        print(f"寄信失敗: {e}")
+        raise HTTPException(status_code=500, detail="驗證碼寄送失敗，請檢查系統 SMTP 設定")
 
 
 @router.post("/register", status_code=201)
 def register(req: RegisterRequest):
     email = req.email.lower().strip()
     username = req.username.strip()
+
+    # 🚀 驗證碼檢查邏輯
+    otp_record = OTP_STORE.get(email)
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="請先獲取驗證碼")
+    if datetime.now() > otp_record["expires"]:
+        raise HTTPException(status_code=400, detail="驗證碼已過期，請重新獲取")
+    if otp_record["otp"] != req.otp:
+        raise HTTPException(status_code=400, detail="驗證碼錯誤")
+        
+    # 驗證成功，清除該信箱的驗證碼紀錄
+    del OTP_STORE[email]
 
     with get_auth_db() as connection:
         with connection.cursor() as cursor:
@@ -74,6 +117,7 @@ def login(req: LoginRequest):
             "email": user["email"],
         },
     }
+
 class GoogleLoginRequest(BaseModel):
     credential: str
 
@@ -124,6 +168,7 @@ def google_login(req: GoogleLoginRequest):
         },
     }
 
+
 class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str = Field(min_length=8, max_length=72)
@@ -131,8 +176,9 @@ class ChangePasswordRequest(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
     new_password: str = Field(min_length=8, max_length=72)
+    otp: str  # 🚀 新增驗證碼欄位
 
-# 1. 更改密碼 (需登入)
+
 @router.post("/change-password")
 def change_password(req: ChangePasswordRequest, current_user=Depends(get_current_user)):
     with get_auth_db() as connection:
@@ -153,9 +199,23 @@ def change_password(req: ChangePasswordRequest, current_user=Depends(get_current
             )
     return {"status": "success", "msg": "密碼修改成功"}
 
+
 @router.post("/forgot-password")
 def forgot_password(req: ForgotPasswordRequest):
     email = req.email.lower().strip()
+    
+    # 🚀 驗證碼檢查邏輯
+    otp_record = OTP_STORE.get(email)
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="請先獲取驗證碼")
+    if datetime.now() > otp_record["expires"]:
+        raise HTTPException(status_code=400, detail="驗證碼已過期，請重新獲取")
+    if otp_record["otp"] != req.otp:
+        raise HTTPException(status_code=400, detail="驗證碼錯誤")
+        
+    # 驗證成功，清除該信箱的驗證碼紀錄
+    del OTP_STORE[email]
+
     with get_auth_db() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -173,9 +233,12 @@ def forgot_password(req: ForgotPasswordRequest):
             )
     return {"status": "success", "msg": "密碼重設成功，請使用新密碼登入"}
 
+
 @router.get("/me")
 def me(current_user=Depends(get_current_user)):
     return {"user": current_user}
+
+
 @router.get("/users")
 def get_all_users(current_user=Depends(get_current_user)):
     ADMIN_EMAILS = ["shaunshih13@gmail.com"]
@@ -189,6 +252,8 @@ def get_all_users(current_user=Depends(get_current_user)):
 
     safe_users = [{"id": u["id"], "username": u["username"], "email": u["email"]} for u in users]
     return {"users": safe_users}
+
+
 @router.delete("/users/{user_id}")
 def delete_user(user_id: int, current_user=Depends(get_current_user)):
     ADMIN_EMAILS = ["shaunshih13@gmail.com"]
