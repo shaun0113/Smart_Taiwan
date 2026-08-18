@@ -176,3 +176,16 @@ def forgot_password(req: ForgotPasswordRequest):
 @router.get("/me")
 def me(current_user=Depends(get_current_user)):
     return {"user": current_user}
+@router.get("/users")
+def get_all_users(current_user=Depends(get_current_user)):
+    ADMIN_EMAILS = ["shaunshih13@gmail.com"]
+    if current_user["email"] not in ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="權限不足，僅限管理員查看")
+
+    with get_auth_db() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT id, username, email FROM users ORDER BY id DESC")
+            users = cursor.fetchall()
+            
+    safe_users = [{"id": u["id"], "username": u["username"], "email": u["email"]} for u in users]
+    return {"users": safe_users}
