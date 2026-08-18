@@ -138,7 +138,7 @@ export const Dashboard = ({ user, onLogout }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // 🚀 新增：管理員視窗狀態與名單資料
+  // 管理員視窗狀態
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [adminUsers, setAdminUsers] = useState([]);
   const [isLoadingAdmin, setIsLoadingAdmin] = useState(false);
@@ -880,6 +880,7 @@ export const Dashboard = ({ user, onLogout }) => {
                       <th className="p-3 border-b border-slate-200 font-bold text-slate-700 w-16">ID</th>
                       <th className="p-3 border-b border-slate-200 font-bold text-slate-700">使用者名稱</th>
                       <th className="p-3 border-b border-slate-200 font-bold text-slate-700">電子郵件</th>
+                      <th className="p-3 border-b border-slate-200 font-bold text-slate-700 w-20 text-center">操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -888,11 +889,19 @@ export const Dashboard = ({ user, onLogout }) => {
                         <td className="p-3 border-b border-slate-100 text-slate-500">{u.id}</td>
                         <td className="p-3 border-b border-slate-100 font-bold text-slate-800">{u.username}</td>
                         <td className="p-3 border-b border-slate-100 text-slate-600">{u.email}</td>
+                        <td className="p-3 border-b border-slate-100 text-center">
+                          <button 
+                            onClick={() => handleDeleteUser(u.id)}
+                            className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition-colors"
+                          >
+                            刪除
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {adminUsers.length === 0 && (
                       <tr>
-                        <td colSpan="3" className="p-6 text-center text-slate-400 text-xs">尚無使用者資料</td>
+                        <td colSpan="4" className="p-6 text-center text-slate-400 text-xs">尚無使用者資料</td>
                       </tr>
                     )}
                   </tbody>
