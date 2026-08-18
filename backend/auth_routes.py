@@ -41,14 +41,16 @@ def send_otp(req: OTPRequest):
     msg["To"] = email
 
     try:
-        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.ehlo()
+        server.starttls()
         server.login("shaunshih13@gmail.com", "ykyq rapk myqy nddw") 
         server.send_message(msg)
         server.quit()
         return {"msg": "驗證碼發送成功"}
     except Exception as e:
         print(f"寄信失敗: {e}")
-        raise HTTPException(status_code=500, detail="驗證碼寄送失敗，請檢查系統 SMTP 設定")
+        raise HTTPException(status_code=500, detail=f"驗證碼寄送失敗: {str(e)}")
 
 
 @router.post("/register", status_code=201)
