@@ -186,6 +186,25 @@ def get_all_users(current_user=Depends(get_current_user)):
         with connection.cursor() as cursor:
             cursor.execute("SELECT id, username, email FROM users ORDER BY id DESC")
             users = cursor.fetchall()
-            
+
     safe_users = [{"id": u["id"], "username": u["username"], "email": u["email"]} for u in users]
     return {"users": safe_users}
+@router.delete("/users/{user_id}")
+def delete_user(user_id: int, current_user=Depends(get_current_user)):
+    ADMIN_EMAILS = ["shaunshih13@gmail.com"]
+    if current_user["email"] not in ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="權限不足，僅限管理員執行")
+
+    with get_auth_db() as connection:
+        with connection.cursor() as cursor:
+            if current_user["id"] == user_id:
+                raise HTTPException(status_code=400, detail="無法刪除自己的管理員帳號")
+
+            cursor.execute("DELETE FROM itineraries WHERE user_id = %s", (user_id,))
+            
+            cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+            
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="找不到該使用者")
+                
+    return {"status": "success", "msg": "帳號已成功刪除"}

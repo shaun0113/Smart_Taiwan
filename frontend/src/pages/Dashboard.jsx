@@ -156,7 +156,7 @@ export const Dashboard = ({ user, onLogout }) => {
     }
   };
 
-  // 🚀 新增：撈取管理員名單的函式
+  // 管理員
   const fetchAdminUsers = async () => {
     setIsLoadingAdmin(true);
     try {
@@ -176,7 +176,26 @@ export const Dashboard = ({ user, onLogout }) => {
       setIsLoadingAdmin(false);
     }
   };
-
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm("確定要永久刪除此帳號嗎？其所有儲存的行程也會一併清空！")) return;
+    
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      const res = await fetch(`${API_BASE_URL}/api/auth/users/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        setAdminUsers(adminUsers.filter(u => u.id !== userId));
+      } else {
+        const data = await res.json();
+        alert(`刪除失敗: ${data.detail}`);
+      }
+    } catch (e) {
+      alert('無法連線至伺服器');
+    }
+  };
   useEffect(() => {
     if (isSidebarOpen) {
       const fetchHistory = async () => {
