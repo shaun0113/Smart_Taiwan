@@ -138,6 +138,11 @@ export const Dashboard = ({ user, onLogout }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // 🚀 新增：管理員視窗狀態與名單資料
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [isLoadingAdmin, setIsLoadingAdmin] = useState(false);
+
   const resultEndRef = useRef(null);
   const itineraryRef = useRef(null);
 
@@ -148,6 +153,27 @@ export const Dashboard = ({ user, onLogout }) => {
     if (file) {
       const imageUrl = URL.createObjectURL(file);
       setCustomBgUrl(imageUrl);
+    }
+  };
+
+  // 🚀 新增：撈取管理員名單的函式
+  const fetchAdminUsers = async () => {
+    setIsLoadingAdmin(true);
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      const res = await fetch(`${API_BASE_URL}/api/auth/users`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAdminUsers(data.users || []);
+      } else {
+        alert(`獲取失敗: ${data.detail}`);
+      }
+    } catch (e) {
+      alert('無法獲取名單，請確認後端已更新');
+    } finally {
+      setIsLoadingAdmin(false);
     }
   };
 
@@ -592,6 +618,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setLoading(true);
       setErrorMsg("");
       setMapQuery(userChoice);
+
       const res = await fetch(`${API_BASE_URL}/api/v1/modify-itinerary`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -815,6 +842,48 @@ export const Dashboard = ({ user, onLogout }) => {
         }
       `}</style>
 
+      {/* 🚀 管理員專屬：檢視註冊名單的彈出視窗 */}
+      {isAdminModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[70] flex items-center justify-center p-4 animate-fadeIn no-print">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border flex flex-col gap-4 max-h-[80vh]">
+            <div className="flex justify-between items-center mb-1">
+              <h3 className="text-lg font-extrabold text-slate-900 m-0">👥 系統註冊名單</h3>
+              <button onClick={() => setIsAdminModalOpen(false)} className="text-slate-400 hover:text-slate-700 text-2xl font-bold leading-none">×</button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto border border-slate-200 rounded-xl bg-slate-50 p-0">
+              {isLoadingAdmin ? (
+                <div className="text-center py-10 text-xs font-bold text-slate-400">載入中...</div>
+              ) : (
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead className="bg-slate-200/60 sticky top-0">
+                    <tr>
+                      <th className="p-3 border-b border-slate-200 font-bold text-slate-700 w-16">ID</th>
+                      <th className="p-3 border-b border-slate-200 font-bold text-slate-700">使用者名稱</th>
+                      <th className="p-3 border-b border-slate-200 font-bold text-slate-700">電子郵件</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminUsers.map(u => (
+                      <tr key={u.id} className="hover:bg-white transition-colors">
+                        <td className="p-3 border-b border-slate-100 text-slate-500">{u.id}</td>
+                        <td className="p-3 border-b border-slate-100 font-bold text-slate-800">{u.username}</td>
+                        <td className="p-3 border-b border-slate-100 text-slate-600">{u.email}</td>
+                      </tr>
+                    ))}
+                    {adminUsers.length === 0 && (
+                      <tr>
+                        <td colSpan="3" className="p-6 text-center text-slate-400 text-xs">尚無使用者資料</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showWarningModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-4">
@@ -855,6 +924,20 @@ export const Dashboard = ({ user, onLogout }) => {
           </h1>
 
           <div className="flex items-center gap-2 sm:gap-4">
+            
+            {/* 🚀 新增：只有特定管理員可以看到這顆按鈕 */}
+            {user?.email === 'shaunshih13@gmail.com' && (
+              <button 
+                onClick={() => {
+                  setIsAdminModalOpen(true);
+                  fetchAdminUsers();
+                }}
+                className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors"
+              >
+                👥 註冊名單
+              </button>
+            )}
+
             <div className="text-right hidden sm:block">
               <div className="text-xs font-bold text-slate-700 dark:text-slate-200">{user?.username}</div>
               <div className="text-[11px] text-slate-400 dark:text-slate-500">{user?.email}</div>
@@ -1131,7 +1214,7 @@ export const Dashboard = ({ user, onLogout }) => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             
             {step === 5 ? (
-              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[750px] lg:col-span-5 animate-fadeIn">
+              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[730px] lg:col-span-5 animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"> 景點推薦名單</h2>
@@ -1243,7 +1326,7 @@ export const Dashboard = ({ user, onLogout }) => {
                 </div>
               </section>
             ) : (
-              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[750px] lg:col-span-5">
+              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[730px] lg:col-span-5">
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="space-y-4 animate-fadeIn">
@@ -1314,7 +1397,7 @@ export const Dashboard = ({ user, onLogout }) => {
                           value={detailRoad}
                           onChange={(e) => setDetailRoad(e.target.value)}
                           placeholder="例如：台北車站、大坪林、二十張路..."
-                          className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
+                          className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:border-emerald-50 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
                         />
                       </div>
 
@@ -1463,8 +1546,8 @@ export const Dashboard = ({ user, onLogout }) => {
               </section>
             )}
 
-            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hidden lg:flex flex-col h-[750px] lg:col-span-7 sticky top-6">
-              <h2 className="text-base font-bold text-slate-900 mb-2">🗺️ 地點即時預覽</h2>
+            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hidden lg:flex flex-col h-[730px] lg:col-span-7 sticky top-6">
+              <h2 className="text-base font-bold text-slate-900 mb-2"> 地點即時預覽</h2>
               <div className="flex-1 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Preview"></iframe>
               </div>
@@ -1479,4 +1562,3 @@ export const Dashboard = ({ user, onLogout }) => {
 };
 
 export default Dashboard;
-     

@@ -296,7 +296,7 @@ export const Dashboard = ({ user, onLogout }) => {
 
     const locationToDisplay = mapQuery || formData.start_location || targetCity;
     const cleanQuery = locationToDisplay.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
-    return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || locationToDisplay)}&z=15&output=embed`;
+    return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || locationToDisplay)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
   };
 
   useEffect(() => {
@@ -520,6 +520,9 @@ export const Dashboard = ({ user, onLogout }) => {
     3. 使用者勾選了 ${selectedSpots.length} 個景點，預計行程天數為 ${formData.days} 天。若勾選景點數量較多，請在【行程概要總覽】下方特別標註一行警示：「⚠️ 提醒：您選取的景點數量較多，部分景點停留時間將壓縮，請注意行程節奏。」
     4. 行程路線規劃必須符合地理鄰近性邏輯。嚴禁出現硬接、跨區大幅度來回折返、或前一站跟下一站相隔極遠的極端動線。排程以「同區域、距離近優先」為首要導向。
     5. 如果使用者勾選的景點數量太少，無法排滿總計 ${formData.days} 天的行程空檔，AI 必須根據當前路線軌跡，主動「穿插推薦 1~2 個完全順路、鄰近的免費熱門小景點或美食」。
+    6. 【遊樂園排程強制約束】：如果使用者選取的景點包含任何「遊樂園」（如六福村、劍湖山、義大世界、九族文化村、麗寶樂園、遠雄海洋公園等），請嚴格遵守以下原則：
+       (a) 遊樂園必須直接佔用「一整天」的行程空檔（從早上營業一直玩到下午或晚上關門營業），當天遊樂園結束後再去其他地方吃晚餐。
+       (b) 除非總行程只有 1 到 2 天，否則「絕對不可以」把遊樂園排在行程的「第一天」或「最後一天」，必須安排在中間的天數。
     
     【⚠️ 系統輸出格式強制要求】：
     你必須「只」回傳一個合法的 JSON 格式字串，絕對不能包含任何其他說明文字或 Markdown 標記（如 \`\`\`json ）。
@@ -589,7 +592,6 @@ export const Dashboard = ({ user, onLogout }) => {
       setLoading(true);
       setErrorMsg("");
       setMapQuery(userChoice);
-
       const res = await fetch(`${API_BASE_URL}/api/v1/modify-itinerary`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -892,7 +894,7 @@ export const Dashboard = ({ user, onLogout }) => {
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border flex flex-col gap-4">
             <div className="flex justify-between items-center mb-1">
               <h3 className="text-lg font-extrabold text-slate-900 m-0">⚙️ 外觀與主題設定</h3>
-              <button onClick={() => setIsThemeModalOpen(false)} className="text-slate-400 hover:text-slate-700 text-2xl font-bold leading-none">&times;</button>
+              <button onClick={() => setIsThemeModalOpen(false)} className="text-slate-400 hover:text-slate-700 text-2xl font-bold leading-none">×</button>
             </div>
             
             <div className="mb-2">
@@ -1129,7 +1131,7 @@ export const Dashboard = ({ user, onLogout }) => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             
             {step === 5 ? (
-              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[730px] lg:col-span-5 animate-fadeIn">
+              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[750px] lg:col-span-5 animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"> 景點推薦名單</h2>
@@ -1241,7 +1243,7 @@ export const Dashboard = ({ user, onLogout }) => {
                 </div>
               </section>
             ) : (
-              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[730px] lg:col-span-5">
+              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[750px] lg:col-span-5">
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="space-y-4 animate-fadeIn">
@@ -1461,8 +1463,8 @@ export const Dashboard = ({ user, onLogout }) => {
               </section>
             )}
 
-            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hidden lg:flex flex-col h-[730px] lg:col-span-7 sticky top-6">
-              <h2 className="text-base font-bold text-slate-900 mb-2"> 地點即時預覽</h2>
+            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hidden lg:flex flex-col h-[750px] lg:col-span-7 sticky top-6">
+              <h2 className="text-base font-bold text-slate-900 mb-2">🗺️ 地點即時預覽</h2>
               <div className="flex-1 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                 <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Preview"></iframe>
               </div>
@@ -1477,3 +1479,4 @@ export const Dashboard = ({ user, onLogout }) => {
 };
 
 export default Dashboard;
+     
