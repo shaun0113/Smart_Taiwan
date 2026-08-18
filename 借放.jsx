@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://127.0.0.1:8000'
+  : 'https://smart-taiwan.onrender.com';
+
 const THEMES = {
   emerald: {
     name: '森林',
@@ -70,7 +74,6 @@ const TAIWAN_DISTRICTS = {
 
 const OFFSHORE_ISLANDS = ["澎湖縣", "金門縣", "連江縣", "澎湖", "金門", "馬祖", "綠島", "蘭嶼", "琉球鄉"];
 
-// 防呆機制：過濾不合規時間
 const sanitizeItinerary = (itinerary) => {
   if (!Array.isArray(itinerary)) return [];
   itinerary.forEach(day => {
@@ -156,7 +159,7 @@ export const Dashboard = ({ user, onLogout }) => {
           const token = localStorage.getItem('token') || localStorage.getItem('access_token');
           if (!token) return;
 
-          const res = await fetch('http://127.0.0.1:8000/api/v1/itineraries', {
+          const res = await fetch(`${API_BASE_URL}/api/v1/itineraries`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const data = await res.json();
@@ -337,7 +340,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setCurrentPage(1);
       setSelectedSpots([]); 
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/recommend-spots', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/recommend-spots`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -360,7 +363,7 @@ export const Dashboard = ({ user, onLogout }) => {
         setStep(4);
       }
     } catch (error) {
-      setErrorMsg("景點海選連線失敗，請確認本地端服務是否正常啟動。");
+      setErrorMsg("景點海選連線失敗，請確認後端服務是否正常運作。");
       setStep(4);
     } finally {
       setLoading(false);
@@ -376,7 +379,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setErrorMsg("");
       setMapQuery(userChoice);
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/analyze-selection', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/analyze-selection`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -396,7 +399,7 @@ export const Dashboard = ({ user, onLogout }) => {
         setErrorMsg(`意見微調失敗：${data.detail || JSON.stringify(data)}`);
       }
     } catch (error) {
-      setErrorMsg("微調意見發送失敗，請檢查本地端連線。");
+      setErrorMsg("微調意見發送失敗，請檢查後端連線。");
     } finally {
       setLoading(false);
     }
@@ -445,7 +448,7 @@ export const Dashboard = ({ user, onLogout }) => {
         form_data: formData
       };
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/itineraries', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/itineraries`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -483,7 +486,7 @@ export const Dashboard = ({ user, onLogout }) => {
       const token = localStorage.getItem('token') || localStorage.getItem('access_token');
       if (!token) return;
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/itineraries', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/itineraries`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -540,7 +543,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setLoading(true);
       setErrorMsg("");
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/generate-final', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/generate-final`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -587,7 +590,7 @@ export const Dashboard = ({ user, onLogout }) => {
       setErrorMsg("");
       setMapQuery(userChoice);
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/modify-itinerary', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/modify-itinerary`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -806,7 +809,7 @@ export const Dashboard = ({ user, onLogout }) => {
           header, .mb-6, iframe, h2, .no-print, form, h3, .mt-6, .map-section { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
           main { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
           .print-area { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
-          .bg-slate-50\\/70 { background: transparent !important; border: none !important; padding: 0 !important; }
+          .bg-slate-50\\/70 { background: transparent !important; border: none !important; padding: 0 !important; margin: 0 !important; }
         }
       `}</style>
 
@@ -842,7 +845,6 @@ export const Dashboard = ({ user, onLogout }) => {
         </div>
       )}
 
-      {/*  導覽列 */}
       <header className="border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-sm no-print relative z-40">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
           
@@ -885,7 +887,6 @@ export const Dashboard = ({ user, onLogout }) => {
         </div>
       </header>
 
-      {/* --- 主題設定與夜間模式 Modal 彈窗 --- */}
       {isThemeModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4 animate-fadeIn no-print">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border flex flex-col gap-4">
@@ -923,7 +924,6 @@ export const Dashboard = ({ user, onLogout }) => {
                 ))}
               </div>
               
-              {/* 自訂圖片 */}
               {activeTheme === 'custom' && (
                  <div className="mt-3 p-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 text-center animate-fadeIn">
                     <input type="file" id="customBg" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -939,7 +939,6 @@ export const Dashboard = ({ user, onLogout }) => {
         </div>
       )}
 
-      {/* --- 右側 Sidebar：更新為圖卡介面渲染 --- */}
       <div className={`fixed inset-0 z-50 transition-opacity no-print ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
         <aside className={`absolute top-0 right-0 w-80 h-full bg-slate-50 dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -972,7 +971,6 @@ export const Dashboard = ({ user, onLogout }) => {
             )}
           </div>
           
-          {/* 清空歷史紀錄按鈕 */}
           {historyList.length > 0 && (
             <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800">
               <button 
@@ -987,8 +985,8 @@ export const Dashboard = ({ user, onLogout }) => {
         </aside>
       </div>
 
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6">
-        <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm no-print">
+      <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-6">
+        <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm no-print max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-2">
             <span className="text-xs font-bold text-emerald-600 tracking-wider">SYSTEM PROGRESS</span>
             <span className="text-xs font-semibold text-slate-400">目前步驟：{Math.floor(step + 1)} / 7</span>
@@ -998,10 +996,10 @@ export const Dashboard = ({ user, onLogout }) => {
           </div>
         </div>
 
-        {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg font-semibold text-sm mb-6 shadow-sm no-print">{errorMsg}</div>}
+        {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg font-semibold text-sm mb-6 shadow-sm no-print max-w-6xl mx-auto">{errorMsg}</div>}
 
         {step === 6 ? (
-          <div className="flex flex-col gap-6 animate-fadeIn">
+          <div className="flex flex-col gap-6 animate-fadeIn max-w-6xl mx-auto">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 map-section no-print">
               <h2 className="text-base font-bold text-slate-900 mb-2"> 智慧啟程導航（點擊更多選項可以看第一天所有行程導航圖）</h2>
               <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
@@ -1027,7 +1025,6 @@ export const Dashboard = ({ user, onLogout }) => {
                 <button onClick={handlePrintPDF} className="px-4 py-2 text-xs font-bold rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-all flex items-center gap-1.5 shadow-sm">匯出 PDF / 列印</button>
               </div>
 
-              {/* 拖曳方塊的 UI */}
               <div className="bg-slate-50/70 rounded-xl p-8 border border-slate-100 min-h-[450px]">
                 {loading ? (
                   <div className="h-[350px] flex flex-col items-center justify-center">
@@ -1107,7 +1104,6 @@ export const Dashboard = ({ user, onLogout }) => {
                 )}
               </div>
 
-              {/*  按鈕區與微調區 */}
               <div className="mt-6 border-t border-slate-100 pt-5 no-print flex flex-col md:flex-row justify-between items-end gap-4">
                 <div className="flex-1 w-full">
                   <h3 className="text-sm font-bold text-slate-800 mb-2"> 對行程不滿意？你想修改哪裡：</h3>
@@ -1117,7 +1113,6 @@ export const Dashboard = ({ user, onLogout }) => {
                   </form>
                 </div>
                 
-                {/*  主要儲存按鈕 */}
                 <button 
                   onClick={handleSaveItinerary} 
                   disabled={isSaving || saveSuccess}
@@ -1131,10 +1126,10 @@ export const Dashboard = ({ user, onLogout }) => {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             
             {step === 5 ? (
-              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[620px] lg:col-span-1 animate-fadeIn">
+              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between min-h-[730px] lg:col-span-5 animate-fadeIn">
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"> 景點推薦名單</h2>
@@ -1155,13 +1150,13 @@ export const Dashboard = ({ user, onLogout }) => {
                       <div>
                         <p className="font-extrabold text-amber-900 mb-0.5">景點數量偏多提示</p>
                         <p className="leading-relaxed">
-                          預計旅遊天數為 <span className="font-black text-amber-950">{formData.days} 天</span>，已勾選 <span className="font-black text-amber-950">{selectedSpots.length} 個景點</span>。景點過多可能導致拉車交通時間拉長，點擊確定時系統將提供優化建議與確認。
+                          預計旅遊天數為 <span className="font-black text-amber-950">{formData.days} 天</span>，已勾選 <span className="font-black text-amber-950">{selectedSpots.length} 個景點</span>。
                         </p>
                       </div>
                     </div>
                   )}
                   
-                  <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 tracking-wide">
+                  <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 tracking-wide max-h-[520px]">
                     {loading ? (
                       <div className="h-full flex flex-col items-center justify-center py-12">
                         <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div></div>
@@ -1246,15 +1241,14 @@ export const Dashboard = ({ user, onLogout }) => {
                 </div>
               </section>
             ) : (
-              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[460px]">
-                {/* 第一步：選擇出發縣市 */}
+              <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:p-6 flex flex-col justify-between min-h-[730px] lg:col-span-5">
                 {step === 0 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="space-y-4 animate-fadeIn">
                       <h2 className="text-base font-bold text-slate-900 mb-1">第一步：你的出發地在哪裡？</h2>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2">選擇出發縣市</label>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[320px] pr-1">
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[380px] pr-1">
                           {Object.keys(TAIWAN_DISTRICTS).map(city => {
                             const isSelected = selectedCity === city;
                             return (
@@ -1286,7 +1280,6 @@ export const Dashboard = ({ user, onLogout }) => {
                   </div>
                 )}
 
-                {/* 第二步：選擇行政區與詳細路段 */}
                 {step === 1 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="space-y-4 animate-fadeIn">
@@ -1295,7 +1288,7 @@ export const Dashboard = ({ user, onLogout }) => {
                       {selectedCity && TAIWAN_DISTRICTS[selectedCity] && (
                         <div>
                           <label className="block text-xs font-bold text-slate-500 mb-2">選擇行政區（{selectedCity}）</label>
-                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[180px] pr-1">
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 overflow-y-auto max-h-[220px] pr-1">
                             {TAIWAN_DISTRICTS[selectedCity].map(dist => {
                               const isSelected = selectedDistrict === dist;
                               return (
@@ -1338,12 +1331,11 @@ export const Dashboard = ({ user, onLogout }) => {
                   </div>
                 )}
 
-                {/* 第三步：選擇目的地 */}
                 {step === 2 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第三步：你想去哪些目的地玩？（可複選）</h2>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[320px] pr-1">
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 my-2 overflow-y-auto max-h-[380px] pr-1">
                         {["基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市", "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣", "澎湖縣", "金門縣", "連江縣"].map(city => {
                           const isSelected = formData.cities.includes(city);
                           return (
@@ -1364,7 +1356,6 @@ export const Dashboard = ({ user, onLogout }) => {
                   </div>
                 )}
 
-                {/* 外島：選擇跨海交通方式 */}
                 {step === 2.5 && (
                   <div className="flex-1 flex flex-col justify-between animate-fadeIn">
                     <div>
@@ -1409,7 +1400,6 @@ export const Dashboard = ({ user, onLogout }) => {
                   </div>
                 )}
 
-                {/* 第四步：天數與偏好設定 */}
                 {step === 3 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
@@ -1458,7 +1448,6 @@ export const Dashboard = ({ user, onLogout }) => {
                   </div>
                 )}
 
-                {/* 第五步：成員設定 */}
                 {step === 4 && (
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
@@ -1471,6 +1460,14 @@ export const Dashboard = ({ user, onLogout }) => {
                 )}
               </section>
             )}
+
+            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hidden lg:flex flex-col h-[730px] lg:col-span-7 sticky top-6">
+              <h2 className="text-base font-bold text-slate-900 mb-2"> 地點即時預覽</h2>
+              <div className="flex-1 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={getMapSrc()} allowFullScreen title="Map Preview"></iframe>
+              </div>
+            </section>
+
           </div>
         )}
       </main>
