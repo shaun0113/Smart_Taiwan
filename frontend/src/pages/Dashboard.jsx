@@ -229,9 +229,9 @@ export const Dashboard = ({ user, onLogout }) => {
     }
   }, [isDarkMode]);
 
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [step]);
+ // useEffect(() => {
+  //  window.scrollTo({ top: 0, behavior: 'smooth' });
+ // }, [step]);
 
   useEffect(() => {
     if (!loading && step === 5) { 
