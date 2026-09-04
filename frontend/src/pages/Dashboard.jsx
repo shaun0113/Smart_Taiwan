@@ -1269,7 +1269,7 @@ export const Dashboard = ({ user, onLogout }) => {
                     </div>
                   )}
                   
-                  <div className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 tracking-wide max-h-[520px]">
+                  <div id="spot-list-container" className="flex-1 overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 tracking-wide max-h-[520px]">
                     {loading ? (
                       <div className="h-full flex flex-col items-center justify-center py-12">
                         <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div></div>
@@ -1328,7 +1328,10 @@ export const Dashboard = ({ user, onLogout }) => {
                   {!loading && totalPages > 1 && (
                     <div className="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-slate-100 no-print">
                       <button
-                        onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                        onClick={() => {
+                          setCurrentPage(p => Math.max(p - 1, 1));
+                          document.getElementById('spot-list-container').scrollTop = 0;
+                        }}
                         disabled={currentPage === 1}
                         className="px-2.5 py-1 text-xs font-semibold rounded border border-slate-200 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
                       >
@@ -1338,7 +1341,10 @@ export const Dashboard = ({ user, onLogout }) => {
                         頁次 {currentPage} / {totalPages}
                       </span>
                       <button
-                        onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                        onClick={() => {
+                          setCurrentPage(p => Math.min(p + 1, totalPages));
+                          document.getElementById('spot-list-container').scrollTop = 0;
+                        }}
                         disabled={currentPage === totalPages}
                         className="px-2.5 py-1 text-xs font-semibold rounded border border-slate-200 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
                       >
