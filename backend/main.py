@@ -66,6 +66,16 @@ class ItineraryCreate(BaseModel):
     itinerary_data: List[Any]
     form_data: Dict[str, Any]
 
+class ItineraryUpdate(BaseModel):
+    title: str
+
+class SharedItineraryCreate(BaseModel):
+    title: str
+    city: str
+    days: int
+    itinerary_data: List[Any]
+    form_data: Dict[str, Any]
+
 @app.post("/api/v1/recommend-spots")
 def api_recommend_spots(req: RecommendRequest):
     user_need = (
@@ -188,3 +198,107 @@ def clear_user_itineraries(current_user: dict = Depends(get_current_user)):
                 (current_user['id'],)
             )
     return {"status": "success", "msg": "歷史紀錄已全數清除"}
+
+@app.put("/api/v1/itineraries/{itinerary_id}")
+def rename_itinerary(itinerary_id: int, payload: ItineraryUpdate, current_user: dict = Depends(get_current_user)):
+    with get_auth_db() as db:
+        with db.cursor() as cursor:
+            cursor.execute(
+                "UPDATE itineraries SET title = %s WHERE id = %s AND user_id = %s",
+                (payload.title, itinerary_id, current_user['id'])
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="找不到該筆行程紀錄")
+    return {"status": "success", "msg": "行程名稱已更新"}
+
+@app.delete("/api/v1/itineraries/{itinerary_id}")
+def delete_single_itinerary(itinerary_id: int, current_user: dict = Depends(get_current_user)):
+    with get_auth_db() as db:
+        with db.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM itineraries WHERE id = %s AND user_id = %s",
+                (itinerary_id, current_user['id'])
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="找不到該筆行程紀錄")
+    return {"status": "success", "msg": "行程已刪除"}
+
+@app.post("/api/v1/shared-itineraries")
+def share_itinerary(payload: SharedItineraryCreate, current_user: dict = Depends(get_current_user)):
+    with get_auth_db() as db:
+        with db.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO shared_itineraries (user_id, title, city, days, itinerary_data, form_data)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    current_user['id'],
+                    payload.title,
+                    payload.city,
+                    payload.days,
+                    json.dumps(payload.itinerary_data),
+                    json.dumps(payload.form_data)
+                )
+            )
+    return {"status": "success", "msg": "行程已成功分享"}
+
+@app.get("/api/v1/shared-itineraries")
+def get_shared_itineraries(cities: str = "", current_user: dict = Depends(get_current_user)):
+    city_list = [c.strip() for c in cities.split(',') if c.strip()]
+    with get_auth_db() as db:
+        with db.cursor() as cursor:
+            if city_list:
+                conditions = " OR ".join(["city LIKE %s"] * len(city_list))
+                params = tuple(f"%{c}%" for c in city_list)
+                cursor.execute(
+                    f"""
+                    SELECT id, title, city, days,
+                           DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%%Y-%%m-%%d %%H:%%i') as created_at
+                    FROM shared_itineraries
+                    WHERE {conditions}
+                    ORDER BY created_at DESC
+                    LIMIT 5
+                    """,
+                    params
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT id, title, city, days,
+                           DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%%Y-%%m-%%d %%H:%%i') as created_at
+                    FROM shared_itineraries
+                    ORDER BY created_at DESC
+                    LIMIT 5
+                    """
+                )
+            return cursor.fetchall()
+
+@app.get("/api/v1/shared-itineraries/{shared_id}")
+def get_shared_itinerary_detail(shared_id: int, current_user: dict = Depends(get_current_user)):
+    with get_auth_db() as db:
+        with db.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, title, city, days, itinerary_data, form_data,
+                       DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%%Y-%%m-%%d %%H:%%i') as created_at
+                FROM shared_itineraries
+                WHERE id = %s
+                """,
+                (shared_id,)
+            )
+            r = cursor.fetchone()
+            if not r:
+                raise HTTPException(status_code=404, detail="找不到該筆分享行程")
+
+            itinerary_data = json.loads(r['itinerary_data']) if isinstance(r['itinerary_data'], str) else r['itinerary_data']
+            form_data = json.loads(r['form_data']) if isinstance(r['form_data'], str) else r['form_data']
+            return {
+                "id": r['id'],
+                "title": r['title'],
+                "city": r['city'],
+                "days": r['days'],
+                "blocks": itinerary_data,
+                "formData": form_data,
+                "created_at": r['created_at']
+            }

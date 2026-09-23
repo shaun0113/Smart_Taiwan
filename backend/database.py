@@ -145,3 +145,22 @@ def init_database() -> None:
                   COLLATE=utf8mb4_unicode_ci
                 """
             )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS shared_itineraries (
+                    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                    user_id BIGINT UNSIGNED NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    city VARCHAR(255) NOT NULL,
+                    days INT NOT NULL,
+                    itinerary_data JSON NOT NULL,
+                    form_data JSON NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    CONSTRAINT fk_shared_itineraries_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB
+                  DEFAULT CHARSET=utf8mb4
+                  COLLATE=utf8mb4_unicode_ci
+                """
+            )

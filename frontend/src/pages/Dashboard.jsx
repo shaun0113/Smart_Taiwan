@@ -135,8 +135,17 @@ export const Dashboard = ({ user, onLogout }) => {
 
   const [historyList, setHistoryList] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [editingHistoryId, setEditingHistoryId] = useState(null);
+  const [editingHistoryTitle, setEditingHistoryTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const [sharedItineraries, setSharedItineraries] = useState([]);
+  const [isLoadingShared, setIsLoadingShared] = useState(false);
+  const [sharedPreviewItem, setSharedPreviewItem] = useState(null);
+  const [isLoadingSharedDetail, setIsLoadingSharedDetail] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState(false);
 
   // 管理員視窗狀態
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
@@ -220,6 +229,31 @@ export const Dashboard = ({ user, onLogout }) => {
       fetchHistory();
     }
   }, [isSidebarOpen]);
+
+  useEffect(() => {
+    if (step === 3 && formData.cities.length > 0) {
+      const fetchShared = async () => {
+        setIsLoadingShared(true);
+        try {
+          const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+          if (!token) return;
+
+          const res = await fetch(`${API_BASE_URL}/api/v1/shared-itineraries?cities=${encodeURIComponent(formData.cities.join(','))}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (res.ok) {
+            setSharedItineraries(data);
+          }
+        } catch (e) {
+          console.error("讀取分享行程失敗", e);
+        } finally {
+          setIsLoadingShared(false);
+        }
+      };
+      fetchShared();
+    }
+  }, [step, formData.cities]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -342,6 +376,33 @@ export const Dashboard = ({ user, onLogout }) => {
     const locationToDisplay = mapQuery || formData.start_location || targetCity;
     const cleanQuery = locationToDisplay.replace(/(想去|我想去|加入|不要去|改去|、|,|，)/g, ' ').trim().split(/\s+/)[0];
     return `https://maps.google.com/maps?q=${encodeURIComponent(cleanQuery || locationToDisplay)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+  };
+
+  const handleNavigateDay = (dayIndex) => {
+    const spots = itineraryBlocks[dayIndex]?.spots || [];
+    const targetCity = formData.cities[0] || '臺北市';
+    const noiseWords = ['出發', '前往', '車程', '交通', '飯店', '民宿', '抵達', '台北', '臺北', '集合', '啟程', '跨縣市', '自駕', '機場', '碼頭', '登機', '車站', '高鐵', '台鐵', '火車'];
+
+    const validSpots = spots.filter(spot => {
+      const isNoise = noiseWords.some(w => spot.name.includes(w));
+      return spot.name && spot.name.length >= 2 && !isNoise;
+    });
+
+    if (validSpots.length === 0) {
+      alert('這天沒有可導航的景點');
+      return;
+    }
+
+    const names = validSpots.map(spot => spot.name.includes(targetCity.substring(0, 2)) ? spot.name : `${targetCity}${spot.name}`);
+    const destination = names[names.length - 1];
+    const waypoints = names.slice(0, -1);
+    const travelMode = formData.transport === '自駕' ? 'driving' : 'transit';
+
+    let url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=${travelMode}`;
+    if (waypoints.length > 0) {
+      url += `&waypoints=${waypoints.map(wp => encodeURIComponent(wp)).join('|')}`;
+    }
+    window.open(url, '_blank');
   };
 
   useEffect(() => {
@@ -517,11 +578,84 @@ export const Dashboard = ({ user, onLogout }) => {
     }
   };
 
+  const handleShareItinerary = async () => {
+    if (itineraryBlocks.length === 0) return;
+    setIsSharing(true);
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      if (!token) {
+        setErrorMsg("請先登入才能分享行程！");
+        setIsSharing(false);
+        return;
+      }
+
+      const locationName = formData.cities[0] ? formData.cities[0] : '台灣';
+
+      const payload = {
+        title: `${locationName}${formData.days}日遊`,
+        city: formData.cities.join(','),
+        days: formData.days,
+        itinerary_data: itineraryBlocks,
+        form_data: formData
+      };
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/shared-itineraries`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setShareSuccess(true);
+        setTimeout(() => setShareSuccess(false), 3000);
+      } else {
+        const data = await res.json();
+        setErrorMsg(`分享失敗: ${data.detail || '未知錯誤'}`);
+      }
+    } catch (e) {
+      console.error("分享失敗", e);
+      setErrorMsg("連線失敗，請確認後端是否啟動");
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   const loadHistory = (item) => {
     setFormData(item.formData);
     setItineraryBlocks(item.blocks);
     setStep(6);
     setIsSidebarOpen(false); 
+  };
+
+  const handleLoadSharedItinerary = (item) => {
+    setFormData(item.formData);
+    setItineraryBlocks(item.blocks);
+    setSharedPreviewItem(null);
+    setStep(6);
+  };
+
+  const openSharedPreview = async (item) => {
+    setSharedPreviewItem({ ...item, blocks: null });
+    setIsLoadingSharedDetail(true);
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      if (!token) return;
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/shared-itineraries/${item.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSharedPreviewItem(data);
+      }
+    } catch (e) {
+      console.error("讀取分享行程詳細內容失敗", e);
+    } finally {
+      setIsLoadingSharedDetail(false);
+    }
   };
 
   const handleClearHistory = async () => {
@@ -547,6 +681,76 @@ export const Dashboard = ({ user, onLogout }) => {
       setErrorMsg("連線失敗，請確認後端是否啟動");
     } finally {
       setIsLoadingHistory(false);
+    }
+  };
+
+  const startEditHistoryTitle = (item, e) => {
+    e.stopPropagation();
+    setEditingHistoryId(item.id);
+    setEditingHistoryTitle(item.title);
+  };
+
+  const cancelEditHistoryTitle = (e) => {
+    if (e) e.stopPropagation();
+    setEditingHistoryId(null);
+    setEditingHistoryTitle('');
+  };
+
+  const saveHistoryTitle = async (item, e) => {
+    if (e) e.stopPropagation();
+    const newTitle = editingHistoryTitle.trim();
+    if (!newTitle || newTitle === item.title) {
+      cancelEditHistoryTitle();
+      return;
+    }
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      if (!token) return;
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/itineraries/${item.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ title: newTitle })
+      });
+
+      if (res.ok) {
+        setHistoryList(historyList.map(h => h.id === item.id ? { ...h, title: newTitle } : h));
+      } else {
+        const data = await res.json();
+        setErrorMsg(`更名失敗: ${data.detail || '未知錯誤'}`);
+      }
+    } catch (e) {
+      console.error("更名失敗", e);
+      setErrorMsg("連線失敗，請確認後端是否啟動");
+    } finally {
+      cancelEditHistoryTitle();
+    }
+  };
+
+  const handleDeleteHistoryItem = async (item, e) => {
+    e.stopPropagation();
+    if (!window.confirm(`確定要刪除「${item.title}」這筆行程紀錄嗎？這個動作無法復原喔！`)) return;
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      if (!token) return;
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/itineraries/${item.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        setHistoryList(historyList.filter(h => h.id !== item.id));
+      } else {
+        const data = await res.json();
+        setErrorMsg(`刪除失敗: ${data.detail || '未知錯誤'}`);
+      }
+    } catch (e) {
+      console.error("刪除該筆歷史紀錄失敗", e);
+      setErrorMsg("連線失敗，請確認後端是否啟動");
     }
   };
 
@@ -1052,6 +1256,53 @@ export const Dashboard = ({ user, onLogout }) => {
         </div>
       )}
 
+      {sharedPreviewItem && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm no-print">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-sm font-black text-emerald-700">{sharedPreviewItem.title}</h3>
+              <button onClick={() => setSharedPreviewItem(null)} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {isLoadingSharedDetail || !sharedPreviewItem.blocks ? (
+                <div className="h-32 flex flex-col items-center justify-center">
+                  <div className="flex items-center space-x-1.5">
+                    <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                    <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                    <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div>
+                  </div>
+                  <p className="text-xs font-semibold text-emerald-600 mt-4">正在載入行程內容...</p>
+                </div>
+              ) : (
+                sharedPreviewItem.blocks.map((day, dIdx) => (
+                  <div key={dIdx}>
+                    <h4 className="text-sm font-bold text-slate-800 mb-1.5">{day.day_title}</h4>
+                    <div className="space-y-1">
+                      {day.spots.map((spot, sIdx) => (
+                        <div key={sIdx} className="text-xs text-slate-600 flex gap-2">
+                          <span className="font-bold text-emerald-600 w-10 shrink-0">{spot.time}</span>
+                          <span className="font-semibold text-slate-800">{spot.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="p-4 border-t border-slate-100 flex gap-2">
+              <button onClick={() => setSharedPreviewItem(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">關閉</button>
+              <button
+                onClick={() => handleLoadSharedItinerary(sharedPreviewItem)}
+                disabled={!sharedPreviewItem.blocks}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+              >
+                存到我的行程並編輯
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={`fixed inset-0 z-50 transition-opacity no-print ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
         <aside className={`absolute top-0 right-0 w-80 h-full bg-slate-50 dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -1071,13 +1322,47 @@ export const Dashboard = ({ user, onLogout }) => {
               historyList.map((item, i) => (
                 <div key={item.id || i} onClick={() => loadHistory(item)} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
                   <div className="flex justify-between items-start mb-2">
-                    <h4 className="text-sm font-black text-emerald-700 dark:text-emerald-500 truncate pr-2">{item.title}</h4>
+                    {editingHistoryId === item.id ? (
+                      <input
+                        autoFocus
+                        type="text"
+                        value={editingHistoryTitle}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setEditingHistoryTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveHistoryTitle(item, e);
+                          if (e.key === 'Escape') cancelEditHistoryTitle(e);
+                        }}
+                        className="text-sm font-black text-emerald-700 dark:text-emerald-500 bg-emerald-50 dark:bg-slate-700 rounded px-1.5 py-0.5 flex-1 mr-2 outline-none border border-emerald-300"
+                      />
+                    ) : (
+                      <h4 className="text-sm font-black text-emerald-700 dark:text-emerald-500 truncate pr-2">{item.title}</h4>
+                    )}
                     <span className="text-[10px] text-slate-400 whitespace-nowrap">{item.created_at}</span>
                   </div>
                   <div className="flex gap-2 mt-3">
-                    <button className="flex-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[11px] font-bold rounded-lg transition-colors pointer-events-none">
-                      載入行程
-                    </button>
+                    {editingHistoryId === item.id ? (
+                      <>
+                        <button onClick={(e) => saveHistoryTitle(item, e)} className="flex-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[11px] font-bold rounded-lg transition-colors">
+                          儲存名稱
+                        </button>
+                        <button onClick={(e) => cancelEditHistoryTitle(e)} className="flex-1 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 text-[11px] font-bold rounded-lg transition-colors">
+                          取消
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="flex-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[11px] font-bold rounded-lg transition-colors pointer-events-none">
+                          載入行程
+                        </button>
+                        <button onClick={(e) => startEditHistoryTitle(item, e)} className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 text-[11px] font-bold rounded-lg transition-colors">
+                          改名稱
+                        </button>
+                        <button onClick={(e) => handleDeleteHistoryItem(item, e)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400 text-[11px] font-bold rounded-lg transition-colors">
+                          刪除
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))
@@ -1210,6 +1495,13 @@ export const Dashboard = ({ user, onLogout }) => {
                               </div>
                             )}
                           </div>
+
+                          <button
+                            onClick={() => handleNavigateDay(dayIndex)}
+                            className="mt-4 w-full py-2.5 rounded-xl bg-slate-800 text-white text-sm font-bold hover:bg-slate-900 transition-colors shadow-md no-print"
+                          >
+                             導航
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -1234,6 +1526,16 @@ export const Dashboard = ({ user, onLogout }) => {
                   }`}
                 >
                   {isSaving ? "儲存中..." : saveSuccess ? " 行程已儲存" : " 儲存行程至紀錄"}
+                </button>
+
+                <button 
+                  onClick={handleShareItinerary} 
+                  disabled={isSharing || shareSuccess}
+                  className={`px-6 py-3 w-full md:w-auto rounded-xl text-sm font-bold transition-all shadow-md flex items-center justify-center gap-2 ${
+                    shareSuccess ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-emerald-600 text-white hover:bg-emerald-700"
+                  }`}
+                >
+                  {isSharing ? "分享中..." : shareSuccess ? " 已分享行程" : " 分享行程給大家"}
                 </button>
               </div>
             </div>
@@ -1435,6 +1737,16 @@ export const Dashboard = ({ user, onLogout }) => {
                         />
                       </div>
 
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">第一天預計出發時間</label>
+                        <input 
+                          type="time"
+                          value={formData.start_time || '08:00'}
+                          onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                          className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:border-emerald-50 focus:ring-emerald-500 outline-none transition-colors shadow-inner font-semibold"
+                        />
+                      </div>
+
                       <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100 text-center">
                         <span className="text-[11px] text-slate-400 block font-semibold">即時預估出發地：</span>
                         <span className="text-xs font-extrabold text-emerald-700">
@@ -1559,6 +1871,31 @@ export const Dashboard = ({ user, onLogout }) => {
                           </div>
                         </div>
                       </div>
+
+                      {formData.cities.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                          <h3 className="text-xs font-bold text-slate-600 mb-2">🔥 其他旅人分享的行程參考（符合你選的目的地）</h3>
+                          {isLoadingShared ? (
+                            <div className="flex items-center gap-1.5 py-2">
+                              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce"></div>
+                              <span className="text-[11px] text-slate-400 ml-1">正在搜尋相關分享...</span>
+                            </div>
+                          ) : sharedItineraries.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {sharedItineraries.map(item => (
+                                <div key={item.id} className="p-3 rounded-xl border border-emerald-100 bg-emerald-50/50 flex flex-col gap-2">
+                                  <span className="text-xs font-black text-emerald-700 truncate">{item.title}</span>
+                                  <button type="button" onClick={() => openSharedPreview(item)} className="text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg py-1.5 transition-colors">查看行程</button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-slate-400">目前尚無符合此目的地的分享行程。</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="flex justify-between mt-6">
                       <button onClick={() => setStep(isOffshoreSelected ? 2.5 : 2)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
