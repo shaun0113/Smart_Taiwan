@@ -141,6 +141,8 @@ export const Dashboard = ({ user, onLogout }) => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const datePickerRef = useRef(null);
 
   const [selectedCity, setSelectedCity] = useState("臺北市"); 
   const [selectedDistrict, setSelectedDistrict] = useState(""); 
@@ -467,6 +469,17 @@ export const Dashboard = ({ user, onLogout }) => {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [step, formData, selectedCity, isOffshoreSelected]);
 
+  useEffect(() => {
+    if (!isDatePickerOpen) return;
+    const handleClickOutside = (e) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target)) {
+        setIsDatePickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isDatePickerOpen]);
+
   const handleCheckboxChange = (field, value) => {
     const currentList = [...formData[field]];
     if (currentList.includes(value)) {
@@ -499,6 +512,7 @@ export const Dashboard = ({ user, onLogout }) => {
       return;
     }
     setFormData({ ...formData, end_date: dateStr, days: diffDays });
+    setIsDatePickerOpen(false);
   };
 
   const renderMonthPanel = (year, month) => {
@@ -1950,35 +1964,43 @@ export const Dashboard = ({ user, onLogout }) => {
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第四步：天數與偏好設定</h2>
-                      <div className="mb-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <label className="text-xs font-semibold text-slate-600">選擇出發日與結束日（最多 7 天）</label>
-                          {formData.start_date && (
-                            <span className="text-xs font-bold text-emerald-600">
-                              {formData.end_date ? `共 ${formData.days} 天` : '請選擇結束日'}
+                      <div className="mb-4" ref={datePickerRef}>
+                        <label className="block text-xs font-semibold text-slate-600 mb-2">選擇出發日與結束日（最多 7 天）</label>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${isDatePickerOpen ? 'border-emerald-500 text-emerald-700 bg-emerald-50/40' : 'border-slate-300 text-slate-700 bg-white hover:border-emerald-400'}`}
+                          >
+                            <span className="flex items-center gap-2 truncate">
+                              <span>📅</span>
+                              <span className="truncate">
+                                {formData.start_date && formData.end_date
+                                  ? `${formData.start_date} ~ ${formData.end_date}（共 ${formData.days} 天）`
+                                  : formData.start_date
+                                    ? `${formData.start_date}，請選擇結束日`
+                                    : '請選擇出發日與結束日'}
+                              </span>
                             </span>
+                            <span className="text-slate-400 text-xs shrink-0">{isDatePickerOpen ? '▲' : '▼'}</span>
+                          </button>
+
+                          {isDatePickerOpen && (
+                            <div className="absolute z-30 mt-2 left-0 p-3 bg-white rounded-xl border border-slate-200 shadow-xl w-full sm:w-[460px]">
+                              <div className="flex items-center justify-between mb-2">
+                                <button type="button" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500">‹</button>
+                                <span className="text-[11px] text-slate-400">先點出發日，再點結束日</span>
+                                <button type="button" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500">›</button>
+                              </div>
+                              <div className="flex gap-4 overflow-x-auto">
+                                {renderMonthPanel(calendarMonth.getFullYear(), calendarMonth.getMonth())}
+                                {renderMonthPanel(
+                                  calendarMonth.getMonth() === 11 ? calendarMonth.getFullYear() + 1 : calendarMonth.getFullYear(),
+                                  calendarMonth.getMonth() === 11 ? 0 : calendarMonth.getMonth() + 1
+                                )}
+                              </div>
+                            </div>
                           )}
-                        </div>
-                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                          <div className="flex items-center justify-between mb-2">
-                            <button type="button" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-200 text-slate-500">‹</button>
-                            <span className="text-[11px] text-slate-400">先點出發日，再點結束日</span>
-                            <button type="button" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-200 text-slate-500">›</button>
-                          </div>
-                          <div className="flex gap-4 overflow-x-auto">
-                            {renderMonthPanel(calendarMonth.getFullYear(), calendarMonth.getMonth())}
-                            {renderMonthPanel(
-                              calendarMonth.getMonth() === 11 ? calendarMonth.getFullYear() + 1 : calendarMonth.getFullYear(),
-                              calendarMonth.getMonth() === 11 ? 0 : calendarMonth.getMonth() + 1
-                            )}
-                          </div>
-                        </div>
-                        <div className="mt-2 text-xs font-semibold text-slate-600 text-center">
-                          {formData.start_date && formData.end_date
-                            ? `已選擇：${formData.start_date} ~ ${formData.end_date}（共 ${formData.days} 天）`
-                            : formData.start_date
-                              ? `出發日：${formData.start_date}，請選擇結束日`
-                              : '尚未選擇日期'}
                         </div>
 
                         {formData.start_date && formData.end_date && (
