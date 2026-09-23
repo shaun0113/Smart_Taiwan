@@ -6,7 +6,7 @@ const API_BASE_URL = window.location.hostname === 'localhost' || window.location
   ? 'http://127.0.0.1:8000'
   : 'https://smart-taiwan.onrender.com';
 
-export function AuthPage({ onAuthenticated }) {
+export function AuthPage({ onAuthenticated, onBack }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [form, setForm] = useState({ username: '', email: '', password: '' });
   const [error, setError] = useState('');
@@ -110,6 +110,15 @@ export function AuthPage({ onAuthenticated }) {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl p-7">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-sm font-semibold text-slate-400 hover:text-emerald-700 mb-4 flex items-center gap-1"
+          >
+            ← 返回首頁
+          </button>
+        )}
         <div className="text-center mb-7">
           <div className="text-4xl mb-3">🧭</div>
           <h1 className="text-2xl font-extrabold text-slate-900">智遊台灣</h1>

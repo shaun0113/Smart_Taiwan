@@ -6,17 +6,17 @@ const API_BASE_URL = window.location.hostname === 'localhost' || window.location
   : 'https://smart-taiwan.onrender.com';
 
 const THEMES = {
-  emerald: {
-    name: '森林',
-    50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 500: '#10b981', 600: '#059669', 700: '#047857',
-    bgDay: "url('https://images.unsplash.com/photo-1448375240586-882707db888b?q=80&w=2560&auto=format&fit=crop')",
-    bgNight: "linear-gradient(rgba(15, 23, 42, 0.75), rgba(2, 44, 34, 0.95)), url('https://images.unsplash.com/photo-1448375240586-882707db888b?q=80&w=2560&auto=format&fit=crop')"
-  },
   blue: {
     name: '大海',
     50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8',
     bgDay: "url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=2560&auto=format&fit=crop')",
     bgNight: "linear-gradient(rgba(15, 23, 42, 0.75), rgba(23, 37, 84, 0.95)), url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=2560&auto=format&fit=crop')"
+  },
+  emerald: {
+    name: '森林',
+    50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 500: '#10b981', 600: '#059669', 700: '#047857',
+    bgDay: "url('https://images.unsplash.com/photo-1448375240586-882707db888b?q=80&w=2560&auto=format&fit=crop')",
+    bgNight: "linear-gradient(rgba(15, 23, 42, 0.75), rgba(2, 44, 34, 0.95)), url('https://images.unsplash.com/photo-1448375240586-882707db888b?q=80&w=2560&auto=format&fit=crop')"
   },
   rose: {
     name: '櫻花',
@@ -174,7 +174,7 @@ export const Dashboard = ({ user, onLogout }) => {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
-  const [activeTheme, setActiveTheme] = useState('emerald');
+  const [activeTheme, setActiveTheme] = useState('blue');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [customBgUrl, setCustomBgUrl] = useState(''); 
 
