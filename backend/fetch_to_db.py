@@ -73,17 +73,18 @@ class TDXToMySQL:
             return
 
         base_url = "https://tdx.transportdata.tw/api/tourism/service/odata/V2/Tourism/Attraction"
-        logger.info("📡 啟動極限配速防禦機制，開始分頁下載全台景點...")
+        logger.info("開始分頁下載全台景點...")
 
         headers = {
             "Authorization": f"Bearer {token}",
             "Accept": "application/json"
         }
 
-        page_size = 50  # 縮小分頁每次只拿50筆，進一步降低伺服器負載
+        page_size = 500  #怕被限流 保持較大分頁以減少總請求次數 上限是1000 但出錯會很麻煩先設為500
         skip_count = 0
         total_inserted = 0
         consecutive_429_count = 0
+        base_backoff = 10.0 
 
         sql = """
             INSERT INTO attractions (title, category, city, address, description, tel)
@@ -98,21 +99,21 @@ class TDXToMySQL:
             }
             
             try:
-                res = requests.get(base_url, headers=headers, params=query_params, timeout=10)
+                res = requests.get(base_url, headers=headers, params=query_params, timeout=20)  # 分頁筆數變大，拉長 timeout 避免誤判逾時
                 
-                # 🚀 核心防禦：如果觸發 429 流量限制
                 if res.status_code == 429:
                     consecutive_429_count += 1
                     if consecutive_429_count > 5:
-                        logger.error("❌ 伺服器持續鎖定，為保護金鑰，中斷本次同步。")
+                        logger.error("伺服器持續鎖定，為保護金鑰，中斷本次同步。")
                         break
-                    
-                    logger.warning(f"⚠️ 遭到 TDX 限制限制 (429)。啟動緊急退讓機制：就地冬眠 15 秒後重試目前分頁...")
-                    time.sleep(15.0)
+
+                    wait_time = base_backoff * (2 ** (consecutive_429_count - 1))  # 退避：10, 20, 40, 80, 160 秒
+                    logger.warning(f"遭到 TDX 限制 (429)。啟動指數退避機制：冬眠 {wait_time:.1f} 秒後重試目前分頁...")
+                    time.sleep(wait_time)
                     continue
                 
                 if res.status_code != 200:
-                    logger.error(f"❌ TDX 伺服器回傳錯誤 ({res.status_code})，跳出。內容: {res.text}")
+                    logger.error(f"TDX 伺服器回傳錯誤 ({res.status_code})，跳出。內容: {res.text}")
                     break
 
                 consecutive_429_count = 0
@@ -143,8 +144,8 @@ class TDXToMySQL:
                     
                 skip_count += page_size
                 
-                logger.info("⏳ 慢速安全間隔：強制休息 3.5 秒...")
-                time.sleep(3.5)
+                logger.info("⏳ 慢速安全間隔：強制休息 5 秒...")
+                time.sleep(5.0)
 
             except Exception as e:
                 logger.error(f" 全量同步過程中發生異常: {str(e)}")

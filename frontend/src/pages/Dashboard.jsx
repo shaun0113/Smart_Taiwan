@@ -81,10 +81,47 @@ const sanitizeItinerary = (itinerary) => {
       day.spots.forEach(spot => {
         const timeMatch = spot.time ? String(spot.time).match(/\d{2}:\d{2}/) : null;
         spot.time = timeMatch ? timeMatch[0] : "09:00"; 
+        spot.needs_ticket = spot.needs_ticket === true;
       });
     }
   });
   return itinerary;
+};
+
+// 縣市對應氣候分區，僅作大概參考，非即時預報
+const CITY_CLIMATE_REGION = {
+  "臺北市": "north", "新北市": "north", "基隆市": "north", "桃園市": "north", "新竹市": "north", "新竹縣": "north", "宜蘭縣": "north",
+  "苗栗縣": "central", "臺中市": "central", "彰化縣": "central", "南投縣": "central", "雲林縣": "central",
+  "嘉義市": "south", "嘉義縣": "south", "臺南市": "south", "高雄市": "south", "屏東縣": "south",
+  "花蓮縣": "east", "臺東縣": "east",
+  "澎湖縣": "island", "金門縣": "island", "連江縣": "island"
+};
+
+const CLIMATE_BY_MONTH = {
+  north:   ["15-19°C・降雨機率高", "15-19°C・降雨機率高", "17-21°C・降雨機率中", "20-24°C・降雨機率中", "23-27°C・降雨機率中高(梅雨)", "26-29°C・降雨機率高(梅雨)", "28-32°C・降雨機率中(午後雷陣雨)", "28-32°C・降雨機率中高(颱風季)", "26-30°C・降雨機率中(颱風季)", "23-27°C・降雨機率中", "19-23°C・降雨機率高", "16-20°C・降雨機率高"],
+  central: ["14-20°C・降雨機率低", "15-21°C・降雨機率低", "17-23°C・降雨機率中低", "21-26°C・降雨機率中", "24-28°C・降雨機率高(梅雨)", "26-30°C・降雨機率高", "27-33°C・降雨機率中(午後雷陣雨)", "27-33°C・降雨機率中", "25-31°C・降雨機率中", "22-27°C・降雨機率低", "18-24°C・降雨機率低", "15-21°C・降雨機率低"],
+  south:   ["16-22°C・降雨機率低", "17-23°C・降雨機率低", "19-25°C・降雨機率低", "22-28°C・降雨機率中低", "25-30°C・降雨機率中(梅雨)", "26-31°C・降雨機率高", "27-33°C・降雨機率中", "27-33°C・降雨機率中高(颱風季)", "26-32°C・降雨機率中", "23-29°C・降雨機率低", "20-26°C・降雨機率低", "17-23°C・降雨機率低"],
+  east:    ["15-20°C・降雨機率中", "16-21°C・降雨機率中", "18-23°C・降雨機率中", "21-25°C・降雨機率中", "23-28°C・降雨機率中高", "25-30°C・降雨機率中", "26-32°C・降雨機率中(颱風季)", "26-32°C・降雨機率高(颱風季)", "25-30°C・降雨機率高(颱風季)", "22-27°C・降雨機率中高", "19-24°C・降雨機率中高", "16-21°C・降雨機率中"],
+  island:  ["14-19°C・降雨機率低(東北季風強)", "14-19°C・降雨機率低(強風)", "16-21°C・降雨機率低", "20-24°C・降雨機率中低", "23-27°C・降雨機率中", "26-29°C・降雨機率中", "28-32°C・降雨機率中低(留意颱風)", "28-32°C・降雨機率中(颱風季)", "26-30°C・降雨機率中(颱風季)", "23-27°C・降雨機率低", "19-24°C・降雨機率低(強風漸增)", "15-20°C・降雨機率低(強風)"]
+};
+
+const MONTH_LABELS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+const WEEKDAY_LABELS = ['週日','週一','週二','週三','週四','週五','週六'];
+
+const getClimateNote = (city, monthIndex) => {
+  const region = CITY_CLIMATE_REGION[city] || "central";
+  return CLIMATE_BY_MONTH[region]?.[monthIndex] || "暫無氣候參考資料";
+};
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const toDateStr = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const getMonthGrid = (year, month) => {
+  const startWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < startWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  return cells;
 };
 
 export const Dashboard = ({ user, onLogout }) => {
@@ -92,11 +129,17 @@ export const Dashboard = ({ user, onLogout }) => {
     start_location: '臺北市',
     cities: ['臺北市'],
     days: 3,
+    start_date: '',
+    end_date: '',
     group_size: '2人',
     tags: [],
     transport: '自駕',
     offshore_transit: '飛機',
     start_time: '08:00'
+  });
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
   const [selectedCity, setSelectedCity] = useState("臺北市"); 
@@ -438,6 +481,63 @@ export const Dashboard = ({ user, onLogout }) => {
     }
   };
 
+  const todayStr = toDateStr(new Date());
+
+  const handleSelectDate = (dateStr) => {
+    if (dateStr < todayStr) return;
+    if (!formData.start_date || formData.end_date) {
+      setFormData({ ...formData, start_date: dateStr, end_date: '' });
+      return;
+    }
+    if (dateStr < formData.start_date) {
+      setFormData({ ...formData, start_date: dateStr, end_date: '' });
+      return;
+    }
+    const diffDays = Math.round((new Date(dateStr) - new Date(formData.start_date)) / 86400000) + 1;
+    if (diffDays > 7) {
+      alert('單次行程最多只能規劃 7 天喔！');
+      return;
+    }
+    setFormData({ ...formData, end_date: dateStr, days: diffDays });
+  };
+
+  const renderMonthPanel = (year, month) => {
+    const cells = getMonthGrid(year, month);
+    return (
+      <div className="flex-1 min-w-[210px]">
+        <div className="text-center text-xs font-bold text-slate-700 mb-2">{year} 年 {month + 1} 月</div>
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-slate-400 mb-1">
+          {WEEKDAY_LABELS.map(w => <span key={w}>{w}</span>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((day, idx) => {
+            if (day === null) return <span key={idx}></span>;
+            const dateStr = toDateStr(new Date(year, month, day));
+            const isPast = dateStr < todayStr;
+            const isEdge = dateStr === formData.start_date || dateStr === formData.end_date;
+            const isInRange = formData.start_date && formData.end_date && dateStr > formData.start_date && dateStr < formData.end_date;
+            return (
+              <button
+                key={idx}
+                type="button"
+                disabled={isPast}
+                onClick={() => handleSelectDate(dateStr)}
+                className={`h-7 text-[11px] rounded-md font-semibold transition-colors ${
+                  isPast ? 'text-slate-300 cursor-not-allowed' :
+                  isEdge ? 'bg-emerald-600 text-white' :
+                  isInRange ? 'bg-emerald-100 text-emerald-700' :
+                  'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {day}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const handleRecommendSpots = async () => {
     try {
       setLoading(true);
@@ -773,15 +873,15 @@ export const Dashboard = ({ user, onLogout }) => {
        (a) 遊樂園必須直接佔用「一整天」的行程空檔（從早上營業一直玩到下午或晚上關門營業），當天遊樂園結束後再去其他地方吃晚餐。
        (b) 除非總行程只有 1 到 2 天，否則「絕對不可以」把遊樂園排在行程的「第一天」或「最後一天」，必須安排在中間的天數。
     
-    【⚠️ 系統輸出格式強制要求】：
+    【系統輸出格式強制要求】：
     你必須「只」回傳一個合法的 JSON 格式字串，絕對不能包含任何其他說明文字或 Markdown 標記（如 \`\`\`json ）。
-    請嚴格遵守以下 JSON 結構（注意："time" 欄位必須是嚴格的 24 小時制 "HH:MM" 格式，絕對不可包含時間範圍或中文）：
+    請嚴格遵守以下 JSON 結構（注意："time" 欄位必須是嚴格的 24 小時制 "HH:MM" 格式，絕對不可包含時間範圍或中文；"needs_ticket" 欄位請依你對該景點的一般常識判斷，若該景點通常需要購買門票或收取入場費，請填 true，若為免費開放的景點（如公園、老街、免費展場等），請填 false，僅需 true/false，不需要提供實際票價）：
     {
       "itinerary": [
         {
           "day_title": "Day 1：標題",
           "spots": [
-            { "id": "1", "time": "09:00", "name": "景點名稱", "desc": "簡短描述" }
+            { "id": "1", "time": "09:00", "name": "景點名稱", "desc": "簡短描述", "needs_ticket": false }
           ]
         }
       ]
@@ -929,7 +1029,8 @@ export const Dashboard = ({ user, onLogout }) => {
       id: `new-${Date.now()}`,
       time: "12:00",
       name: "新景點",
-      desc: "點擊修改描述"
+      desc: "點擊修改描述",
+      needs_ticket: false
     });
     setItineraryBlocks(newBlocks);
     setIsRouteModified(true);
@@ -1279,9 +1380,14 @@ export const Dashboard = ({ user, onLogout }) => {
                     <h4 className="text-sm font-bold text-slate-800 mb-1.5">{day.day_title}</h4>
                     <div className="space-y-1">
                       {day.spots.map((spot, sIdx) => (
-                        <div key={sIdx} className="text-xs text-slate-600 flex gap-2">
+                        <div key={sIdx} className="text-xs text-slate-600 flex gap-2 items-center">
                           <span className="font-bold text-emerald-600 w-10 shrink-0">{spot.time}</span>
                           <span className="font-semibold text-slate-800">{spot.name}</span>
+                          {spot.needs_ticket ? (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5">🎫 需門票</span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-1.5 py-0.5">🆓 免費</span>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1463,6 +1569,15 @@ export const Dashboard = ({ user, onLogout }) => {
                               >
                                 <div className="text-slate-300 cursor-grab px-1 no-print">⣿</div>
                                 
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditSpot(dayIndex, spotIndex, 'needs_ticket', !spot.needs_ticket)}
+                                  title="點擊切換是否需要門票（僅供參考）"
+                                  className={`shrink-0 text-[10px] font-bold rounded-full px-2 py-1 border transition-colors ${spot.needs_ticket ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}
+                                >
+                                  {spot.needs_ticket ? '🎫 需門票' : '🆓 免費'}
+                                </button>
+
                                 <div className="flex-1 grid grid-cols-12 gap-3 items-center">
                                   <input 
                                     type="time"
@@ -1836,12 +1951,46 @@ export const Dashboard = ({ user, onLogout }) => {
                     <div>
                       <h2 className="text-base font-bold text-slate-900 mb-1">第四步：天數與偏好設定</h2>
                       <div className="mb-4">
-                        <div className="flex justify-between items-center mb-1">
-                          <label className="text-xs font-semibold text-slate-600">預計天數</label>
-                          <span className="text-sm font-bold text-emerald-600">{formData.days} 天</span>
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="text-xs font-semibold text-slate-600">選擇出發日與結束日（最多 7 天）</label>
+                          {formData.start_date && (
+                            <span className="text-xs font-bold text-emerald-600">
+                              {formData.end_date ? `共 ${formData.days} 天` : '請選擇結束日'}
+                            </span>
+                          )}
                         </div>
-                        <input type="range" min="1" max="7" value={formData.days} onChange={(e) => setFormData({ ...formData, days: parseInt(e.target.value) })} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" />
-                        <div className="flex justify-between text-[10px] text-slate-400 px-1 mt-1"><span>1天</span><span>2天</span><span>3天</span><span>4天</span><span>5天</span><span>6天</span><span>7天</span></div>
+                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <button type="button" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-200 text-slate-500">‹</button>
+                            <span className="text-[11px] text-slate-400">先點出發日，再點結束日</span>
+                            <button type="button" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-200 text-slate-500">›</button>
+                          </div>
+                          <div className="flex gap-4 overflow-x-auto">
+                            {renderMonthPanel(calendarMonth.getFullYear(), calendarMonth.getMonth())}
+                            {renderMonthPanel(
+                              calendarMonth.getMonth() === 11 ? calendarMonth.getFullYear() + 1 : calendarMonth.getFullYear(),
+                              calendarMonth.getMonth() === 11 ? 0 : calendarMonth.getMonth() + 1
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-2 text-xs font-semibold text-slate-600 text-center">
+                          {formData.start_date && formData.end_date
+                            ? `已選擇：${formData.start_date} ~ ${formData.end_date}（共 ${formData.days} 天）`
+                            : formData.start_date
+                              ? `出發日：${formData.start_date}，請選擇結束日`
+                              : '尚未選擇日期'}
+                        </div>
+
+                        {formData.start_date && formData.end_date && (
+                          <div className="mt-3 p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100">
+                            <span className="text-[11px] text-slate-400 block font-semibold mb-1">🌤 目的地氣候參考（{MONTH_LABELS[new Date(formData.start_date).getMonth()]}，僅供大概參考，非實際預報）</span>
+                            <div className="flex flex-col gap-0.5">
+                              {formData.cities.map(c => (
+                                <span key={c} className="text-xs font-bold text-emerald-700">{c}：{getClimateNote(c, new Date(formData.start_date).getMonth())}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="mb-4">
                         <label className="block text-xs font-semibold text-slate-600 mb-2">當地交通工具</label>
@@ -1899,7 +2048,13 @@ export const Dashboard = ({ user, onLogout }) => {
                     </div>
                     <div className="flex justify-between mt-6">
                       <button onClick={() => setStep(isOffshoreSelected ? 2.5 : 2)} className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-500">上一步</button>
-                      <button onClick={() => setStep(4)} className="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700">下一步</button>
+                      <button
+                        onClick={() => setStep(4)}
+                        disabled={!formData.start_date || !formData.end_date}
+                        className={`px-5 py-2 rounded-lg text-sm font-bold text-white transition-colors ${(!formData.start_date || !formData.end_date) ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                      >
+                        下一步
+                      </button>
                     </div>
                   </div>
                 )}
