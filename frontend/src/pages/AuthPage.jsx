@@ -120,7 +120,7 @@ export function AuthPage({ onAuthenticated, onBack }) {
           </button>
         )}
         <div className="text-center mb-7">
-          <div className="text-4xl mb-3">🧭</div>
+          <div className="text-4xl mb-3"></div>
           <h1 className="text-2xl font-extrabold text-slate-900">智遊台灣</h1>
           <p className="text-sm text-slate-500 mt-2">
             登入後開始建立你的專屬旅遊行程

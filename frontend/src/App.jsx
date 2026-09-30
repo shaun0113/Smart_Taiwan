@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { AuthPage } from './pages/AuthPage';
 import { Dashboard } from './pages/Dashboard';
-import { Landing } from './pages/Landing';
+import Home from './pages/Home';
 import { getMe, getStoredUser, getToken, logout } from './services/auth';
 
 export default function App() {
   const [user, setUser] = useState(getStoredUser());
   const [checking, setChecking] = useState(Boolean(getToken()));
-  const [view, setView] = useState('landing'); // 'landing' | 'auth'
+  const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
     if (!getToken()) {
@@ -27,7 +27,7 @@ export default function App() {
   function handleLogout() {
     logout();
     setUser(null);
-    setView('landing');
+    setShowAuth(false);
   }
 
   if (checking) {
@@ -35,10 +35,9 @@ export default function App() {
   }
 
   if (!user) {
-    if (view === 'landing') {
-      return <Landing onStart={() => setView('auth')} />;
-    }
-    return <AuthPage onAuthenticated={setUser} onBack={() => setView('landing')} />;
+    return showAuth
+      ? <AuthPage onAuthenticated={setUser} onBack={() => setShowAuth(false)} />
+      : <Home onStart={() => setShowAuth(true)} />;
   }
 
   return <Dashboard user={user} onLogout={handleLogout} />;
