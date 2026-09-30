@@ -1525,7 +1525,7 @@ export const Dashboard = ({ user, onLogout }) => {
               </div>
             </div>
 
-            <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col print-area">
+            <div ref={itineraryRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col print-area dashboard-itinerary">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
                 <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">智遊台灣 專屬旅遊行程規劃表</h2>
                 <div className="flex gap-2 items-center">
@@ -1564,7 +1564,7 @@ export const Dashboard = ({ user, onLogout }) => {
 
                     <div className="flex flex-col gap-6">
                       {itineraryBlocks.map((day, dayIndex) => (
-                        <div key={dayIndex} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <div key={dayIndex} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm itinerary-day-card">
                           <div className="flex justify-between items-center mb-4 border-b pb-2">
                             <h3 className="text-lg font-black text-emerald-700">{day.day_title}</h3>
                             <button onClick={() => handleAddSpot(dayIndex)} className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-100 transition-colors no-print">+ 新增方塊</button>
@@ -1579,7 +1579,7 @@ export const Dashboard = ({ user, onLogout }) => {
                                 onDragEnter={(e) => handleDragEnter(e, dayIndex, spotIndex)}
                                 onDragEnd={handleDragEnd}
                                 onDragOver={(e) => e.preventDefault()}
-                                className="bg-slate-50 border border-slate-200 p-3 rounded-xl shadow-xs flex items-center gap-3 cursor-grab active:cursor-grabbing hover:border-emerald-400 hover:shadow-md transition-all group"
+                                className="bg-slate-50 border border-slate-200 p-3 rounded-xl shadow-xs flex items-center gap-3 cursor-grab active:cursor-grabbing hover:border-emerald-400 hover:shadow-md transition-all group itinerary-spot-row"
                               >
                                 <div className="text-slate-300 cursor-grab px-1 no-print">⣿</div>
                                 
@@ -1592,7 +1592,7 @@ export const Dashboard = ({ user, onLogout }) => {
                                   {spot.needs_ticket ? '🎫 需門票' : '🆓 免費'}
                                 </button>
 
-                                <div className="flex-1 grid grid-cols-12 gap-3 items-center">
+                                <div className="flex-1 min-w-0 grid grid-cols-12 gap-3 items-center itinerary-spot-fields">
                                   <input 
                                     type="time"
                                     className="col-span-3 lg:col-span-2 text-sm font-bold text-slate-600 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-emerald-500 outline-none transition-colors cursor-pointer"
