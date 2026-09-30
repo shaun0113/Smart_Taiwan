@@ -5,6 +5,7 @@ import logging
 import time
 from google import genai
 from google.genai import types
+from database import get_travel_db
 
 try:
     from dotenv import load_dotenv
@@ -50,35 +51,33 @@ class SmartTourEngine:
 
     def _query_spots_from_db(self, cities: list) -> list:
         try:
-            conn = pymysql.connect(**self.db_config)
-            cursor = conn.cursor()
+            with get_travel_db() as conn:
+                cursor = conn.cursor()
+                cleaned_spots = []
+                for city in cities:
+                    clean_city = city.strip()
+                    if clean_city in ["台北市", "台北"]: clean_city = "臺北市"
+                    if clean_city in ["台中市", "台中"]: clean_city = "臺中市"
+                    if clean_city in ["台南市", "台南"]: clean_city = "臺南市"
+
+                    query = "SELECT title, address, description FROM attractions WHERE city = %s"
+                    try:
+                        cursor.execute(query, (clean_city,))
+                        rows = cursor.fetchall()
+                        for row in rows:
+                            cleaned_spots.append({
+                                "name": row["title"],
+                                "address": row["address"],
+                                "description": row["description"][:120] + "..." if row["description"] else "暫無詳細說明"
+                            })
+                    except Exception as e:
+                        logger.error(f"❌ 讀取 MySQL 異常 ({clean_city}): {str(e)}")
+
+                cursor.close()
+                return cleaned_spots
         except Exception as e:
             logger.error(f"❌ 後端連線 MySQL 失敗: {str(e)}")
-            return []
-        
-        cleaned_spots = []
-        for city in cities:
-            clean_city = city.strip()
-            if clean_city in ["台北市", "台北"]: clean_city = "臺北市"
-            if clean_city in ["台中市", "台中"]: clean_city = "臺中市"
-            if clean_city in ["台南市", "台南"]: clean_city = "臺南市"
-            
-            query = "SELECT title, address, description FROM attractions WHERE city = %s"
-            try:
-                cursor.execute(query, (clean_city,))
-                rows = cursor.fetchall()
-                for row in rows:
-                    cleaned_spots.append({
-                        "name": row["title"],
-                        "address": row["address"],
-                        "description": row["description"][:120] + "..." if row["description"] else "暫無詳細說明"
-                    })
-            except Exception as e:
-                logger.error(f"❌ 讀取 MySQL 異常 ({clean_city}): {str(e)}")
-                
-        cursor.close()
-        conn.close()
-        return cleaned_spots
+            raise RuntimeError("旅遊資料庫目前無法連線，暫停推薦以避免產生未驗證景點") from e
 
     def recommend_spots(self, user_need: str, city: str, tags: list, accumulated_spots: str) -> str:
         if not self.api_keys:
@@ -88,7 +87,7 @@ class SmartTourEngine:
         db_spots = self._query_spots_from_db(target_cities)
         
         if not db_spots:
-            db_spots = [{"name": "系統備用模式", "address": "請 AI 依據知名地標排程", "description": "本地數據庫無符合景點"}]
+            raise RuntimeError("資料庫查無符合目的地的官方景點資料，暫停推薦以避免 AI 自行編造景點")
 
         sys_instruction = """
         你是一個台灣旅遊景點推薦機器人。請依據偏好設定以及需求從資料庫清單中挑選 25 到 50 個景點。

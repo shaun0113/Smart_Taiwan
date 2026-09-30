@@ -66,7 +66,8 @@ def _travel_connection_config() -> Dict[str, Any]:
                 raise RuntimeError(f"找不到 Aiven CA 憑證：{ca_path}")
             config["ssl"] = {"ca": str(ca_path), "check_hostname": True}
         else:
-            config["ssl"] = {}
+            # TiDB Cloud public endpoints require TLS even when no local CA file is provided.
+            config["ssl"] = {"check_hostname": True}
 
     return config
 

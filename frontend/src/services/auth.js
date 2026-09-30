@@ -3,7 +3,7 @@
 const API_BASE = 'http://127.0.0.1:8000';
 
 export function getToken() {
-  return localStorage.getItem('access_token');
+  return localStorage.getItem('access_token') || localStorage.getItem('token');
 }
 
 export function getStoredUser() {
@@ -53,5 +53,6 @@ export async function getMe() {
 
 export function logout() {
   localStorage.removeItem('access_token');
+  localStorage.removeItem('token');
   localStorage.removeItem('user');
 }

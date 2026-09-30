@@ -3,6 +3,11 @@ import requests
 import logging
 import pymysql
 import time
+from pathlib import Path
+from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env", override=True)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -10,19 +15,19 @@ logger = logging.getLogger(__name__)
 class TDXToMySQL:
     def __init__(self):
         # 優先讀取雲端環境變數，若讀不到才拿你原本的當備用（防呆安全機制）
-        self.tdx_id = os.environ.get('TDX_CLIENT_ID', 'a112222028-fb0180d6-bcf1-4afb')
-        self.tdx_secret = os.environ.get('TDX_CLIENT_SECRET', 'f244a993-d7f3-4c08-986d-b60e472362f7')
+        self.tdx_id = os.environ.get('TDX_CLIENT_ID', '')
+        self.tdx_secret = os.environ.get('TDX_CLIENT_SECRET', '')
 
         # 核心修復：動態讀取雲端/本地環境變數，並強制加上 Aiven 所需的 SSL 連線加密參數
         self.db_config = {
             "host": os.environ.get('DB_HOST', '127.0.0.1'),
             "port": int(os.environ.get('DB_PORT', 3306)),
             "user": os.environ.get('DB_USER', 'root'),
-            "password": os.environ.get('DB_PASSWORD', 'Yjo494m6..'),          
+            "password": os.environ.get('DB_PASSWORD', ''),
             "database": os.environ.get('DB_NAME', 'smart_tour_taiwan'),     
             "charset": "utf8mb4",
             "cursorclass": pymysql.cursors.DictCursor,
-            "ssl": {"ssl_mode": "REQUIRED"}  # 👈 核心關鍵：強制要求 SSL 加密，解決 Aiven 連線被踢的問題
+            "ssl": {"check_hostname": True}
         }
 
     def _get_tdx_token(self):
