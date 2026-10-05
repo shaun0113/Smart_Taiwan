@@ -49,7 +49,15 @@ class SmartTourEngine:
         else:
             logger.info(f"🔑 成功加載 {len(self.api_keys)} 組 Gemini API 金鑰！")
 
+    def _safe_error_message(self, error: Exception) -> str:
+        message = str(error)
+        for api_key in self.api_keys:
+            if api_key:
+                message = message.replace(api_key, "[REDACTED]")
+        return f"{type(error).__name__}: {message[:300]}"
+
     def _query_spots_from_db(self, cities: list) -> list:
+        logger.info("attractions query started city_count=%d", len(cities))
         try:
             with get_travel_db() as conn:
                 cursor = conn.cursor()
@@ -64,6 +72,11 @@ class SmartTourEngine:
                     try:
                         cursor.execute(query, (clean_city,))
                         rows = cursor.fetchall()
+                        logger.info(
+                            "attractions query completed city=%s result_count=%d",
+                            clean_city,
+                            len(rows),
+                        )
                         for row in rows:
                             cleaned_spots.append({
                                 "name": row["title"],
@@ -71,16 +84,18 @@ class SmartTourEngine:
                                 "description": row["description"][:120] + "..." if row["description"] else "暫無詳細說明"
                             })
                     except Exception as e:
-                        logger.error(f"❌ 讀取 MySQL 異常 ({clean_city}): {str(e)}")
+                        logger.exception("attractions query failed city=%s", clean_city)
 
                 cursor.close()
                 return cleaned_spots
         except Exception as e:
-            logger.error(f"❌ 後端連線 MySQL 失敗: {str(e)}")
+            logger.exception("travel database operation failed")
             raise RuntimeError("旅遊資料庫目前無法連線，暫停推薦以避免產生未驗證景點") from e
 
     def recommend_spots(self, user_need: str, city: str, tags: list, accumulated_spots: str) -> str:
+        logger.info("Gemini operation=recommend_spots started")
         if not self.api_keys:
+            logger.error("Gemini operation=recommend_spots skipped; no API keys configured")
             return "Gemini API 尚未正確初始化。"
 
         target_cities = [c.strip() for c in city.split(",") if c.strip()]
@@ -112,8 +127,13 @@ class SmartTourEngine:
 
         last_error = None
         for index, key in enumerate(self.api_keys):
+            started_at = time.perf_counter()
+            logger.info(
+                "Gemini operation=recommend_spots attempt=%d/%d started",
+                index + 1,
+                len(self.api_keys),
+            )
             try:
-                logger.info(f" 景點推薦中，嘗試第 {index + 1} 把 Key...")
                 client = genai.Client(api_key=key)
                 response = client.models.generate_content(
                     model=self.model_name,
@@ -124,20 +144,42 @@ class SmartTourEngine:
                     )
                 )
                 if response.text:
+                    duration_ms = (time.perf_counter() - started_at) * 1000
+                    logger.info(
+                        "Gemini operation=recommend_spots succeeded attempt=%d duration_ms=%.1f",
+                        index + 1,
+                        duration_ms,
+                    )
                     return response.text
+                logger.warning("Gemini operation=recommend_spots returned empty response attempt=%d", index + 1)
             except Exception as e:
-                logger.warning(f"⚠️ 第 {index + 1} 把 Key 請求受挫 ({e})，準備切換下一把...")
+                duration_ms = (time.perf_counter() - started_at) * 1000
+                logger.warning(
+                    "Gemini operation=recommend_spots failed attempt=%d duration_ms=%.1f error=%s",
+                    index + 1,
+                    duration_ms,
+                    self._safe_error_message(e),
+                )
                 last_error = e
                 time.sleep(1)
-        
+        logger.error(
+            "Gemini operation=recommend_spots exhausted attempts error=%s",
+            self._safe_error_message(last_error) if last_error else "empty response",
+        )
         return f"景點海選引擎發生異常：{last_error}"
 
     def analyze_selection(self, user_choice: str, spots_recommendation: str, accumulated_spots: str, user_need: str):
+        logger.info("Gemini operation=analyze_selection started")
         safe_user_choice = user_choice if user_choice is not None else ""
         safe_accumulated = accumulated_spots if accumulated_spots is not None else ""
 
         if not safe_user_choice.strip():
+            logger.info("Gemini operation=analyze_selection skipped; empty user choice")
             return "CONTINUE", safe_accumulated, "您好像沒有輸入任何內容？"
+
+        if not self.api_keys:
+            logger.error("Gemini operation=analyze_selection skipped; no API keys configured")
+            return "CONTINUE", safe_accumulated, f"已記錄需求：『{safe_user_choice}』"
 
         guardrail_prompt = f"""
         分析使用者輸入：『{safe_user_choice}』
@@ -146,7 +188,14 @@ class SmartTourEngine:
         只輸出 JSON: {{"status": "CONTINUE", "accumulated_spots": "景點A + 景點B", "msg": "回應"}}
         """
 
+        last_error = None
         for index, key in enumerate(self.api_keys):
+            started_at = time.perf_counter()
+            logger.info(
+                "Gemini operation=analyze_selection attempt=%d/%d started",
+                index + 1,
+                len(self.api_keys),
+            )
             try:
                 client = genai.Client(api_key=key)
                 response = client.models.generate_content(
@@ -155,15 +204,33 @@ class SmartTourEngine:
                     config=types.GenerateContentConfig(response_mime_type="application/json")
                 )
                 result = json.loads(response.text.strip())
+                duration_ms = (time.perf_counter() - started_at) * 1000
+                logger.info(
+                    "Gemini operation=analyze_selection succeeded attempt=%d duration_ms=%.1f",
+                    index + 1,
+                    duration_ms,
+                )
                 return result["status"], result["accumulated_spots"], result["msg"]
             except Exception as e:
-                logger.warning(f"⚠️ 意圖分析 Key #{index + 1} 重試中... ({e})")
+                duration_ms = (time.perf_counter() - started_at) * 1000
+                logger.warning(
+                    "Gemini operation=analyze_selection failed attempt=%d duration_ms=%.1f error=%s",
+                    index + 1,
+                    duration_ms,
+                    self._safe_error_message(e),
+                )
+                last_error = e
                 time.sleep(1)
-                
+        logger.error(
+            "Gemini operation=analyze_selection exhausted attempts error=%s",
+            self._safe_error_message(last_error) if last_error else "unknown error",
+        )
         return "CONTINUE", safe_accumulated, f"已記錄需求：『{safe_user_choice}』"
 
     def generate_final_itinerary(self, accumulated_spots: str, user_need: str, city: str, transport: str = "自駕", start_location: str = "臺北市", start_time: str = "08:00") -> str:
+        logger.info("Gemini operation=generate_final_itinerary started")
         if not self.api_keys:
+            logger.error("Gemini operation=generate_final_itinerary skipped; no API keys configured")
             return "Gemini API 尚未正確初始化。"
 
         spots_context = accumulated_spots if accumulated_spots else "請依照前述海選推薦名單排程。"
@@ -181,33 +248,75 @@ class SmartTourEngine:
         
         last_error = None
         for index, key in enumerate(self.api_keys):
+            started_at = time.perf_counter()
+            logger.info(
+                "Gemini operation=generate_final_itinerary attempt=%d/%d started",
+                index + 1,
+                len(self.api_keys),
+            )
             try:
-                logger.info(f"🔄 最終行程生成中，使用第 {index + 1} 把 Key...")
                 client = genai.Client(api_key=key)
                 response = client.models.generate_content(model=self.model_name, contents=prompt)
                 if response.text:
+                    duration_ms = (time.perf_counter() - started_at) * 1000
+                    logger.info(
+                        "Gemini operation=generate_final_itinerary succeeded attempt=%d duration_ms=%.1f",
+                        index + 1,
+                        duration_ms,
+                    )
                     return response.text
+                logger.warning("Gemini operation=generate_final_itinerary returned empty response attempt=%d", index + 1)
             except Exception as e:
-                logger.warning(f"⚠️ 最終行程生成 Key #{index + 1} 重試中... ({e})")
+                duration_ms = (time.perf_counter() - started_at) * 1000
+                logger.warning(
+                    "Gemini operation=generate_final_itinerary failed attempt=%d duration_ms=%.1f error=%s",
+                    index + 1,
+                    duration_ms,
+                    self._safe_error_message(e),
+                )
                 last_error = e
                 time.sleep(1)
-                
+        logger.error(
+            "Gemini operation=generate_final_itinerary exhausted attempts error=%s",
+            self._safe_error_message(last_error) if last_error else "empty response",
+        )
         return f"最終行程生成引擎發生異常：{last_error}"
 
     def modify_itinerary(self, current_itinerary: str, modification_demand: str) -> str:
+        logger.info("Gemini operation=modify_itinerary started")
         if not self.api_keys:
+            logger.error("Gemini operation=modify_itinerary skipped; no API keys configured")
             return "Gemini API 尚未正確初始化。"
 
         prompt = f"微調指令：『{modification_demand}』\n現有行程：\n{current_itinerary}"
         
         for index, key in enumerate(self.api_keys):
+            started_at = time.perf_counter()
+            logger.info(
+                "Gemini operation=modify_itinerary attempt=%d/%d started",
+                index + 1,
+                len(self.api_keys),
+            )
             try:
                 client = genai.Client(api_key=key)
                 response = client.models.generate_content(model=self.model_name, contents=prompt)
                 if response.text:
+                    duration_ms = (time.perf_counter() - started_at) * 1000
+                    logger.info(
+                        "Gemini operation=modify_itinerary succeeded attempt=%d duration_ms=%.1f",
+                        index + 1,
+                        duration_ms,
+                    )
                     return response.text
+                logger.warning("Gemini operation=modify_itinerary returned empty response attempt=%d", index + 1)
             except Exception as e:
-                logger.warning(f"行程微調 Key #{index + 1} 重試中... ({e})")
+                duration_ms = (time.perf_counter() - started_at) * 1000
+                logger.warning(
+                    "Gemini operation=modify_itinerary failed attempt=%d duration_ms=%.1f error=%s",
+                    index + 1,
+                    duration_ms,
+                    self._safe_error_message(e),
+                )
                 time.sleep(1)
-                
+        logger.error("Gemini operation=modify_itinerary exhausted attempts")
         raise Exception("微調引擎發生異常。")

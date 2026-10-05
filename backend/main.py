@@ -2,6 +2,8 @@ import os
 import json 
 import smtplib
 import random
+import logging
+import time
 from fastapi import FastAPI, HTTPException, Depends 
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -18,7 +20,47 @@ from auth import get_current_user
 
 load_dotenv()
 
+LOG_LEVEL = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO)
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+logging.getLogger().setLevel(LOG_LEVEL)
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="智遊台灣 AI 行程排程引擎 API")
+
+
+@app.middleware("http")
+async def log_http_requests(request, call_next):
+    started_at = time.perf_counter()
+    method = request.method
+    path = request.url.path
+    logger.info("request started method=%s path=%s", method, path)
+
+    try:
+        response = await call_next(request)
+    except Exception:
+        duration_ms = (time.perf_counter() - started_at) * 1000
+        logger.exception(
+            "request failed method=%s path=%s duration_ms=%.1f",
+            method,
+            path,
+            duration_ms,
+        )
+        raise
+
+    duration_ms = (time.perf_counter() - started_at) * 1000
+    outcome = "success" if response.status_code < 400 else "failed"
+    logger.info(
+        "request completed method=%s path=%s status_code=%d outcome=%s duration_ms=%.1f",
+        method,
+        path,
+        response.status_code,
+        outcome,
+        duration_ms,
+    )
+    return response
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,7 +76,13 @@ app.include_router(profile_router)
 
 @app.on_event("startup")
 def startup_event():
-    init_database()
+    logger.info("startup database initialization started")
+    try:
+        init_database()
+    except Exception:
+        logger.exception("startup database initialization failed")
+        raise
+    logger.info("startup database initialization completed")
 
 class RecommendRequest(BaseModel):
     city: str  

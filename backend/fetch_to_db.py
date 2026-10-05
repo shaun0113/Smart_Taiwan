@@ -32,6 +32,7 @@ class TDXToMySQL:
 
     def _get_tdx_token(self):
         """向 TDX 平台換取臨時 Access Token"""
+        logger.info("TDX token request started")
         auth_url = "https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token"
         payload = {
             'grant_type': 'client_credentials',
@@ -42,11 +43,16 @@ class TDXToMySQL:
         try:
             res = requests.post(auth_url, data=payload, headers=headers, timeout=5)
             if res.status_code == 200:
-                return res.json().get("access_token")
+                token = res.json().get("access_token")
+                if token:
+                    logger.info("TDX token request succeeded")
+                else:
+                    logger.error("TDX token request failed; response did not contain an access token")
+                return token
             logger.error(f"❌ Token 換取失敗: {res.status_code}")
             return None
         except Exception as e:
-            logger.error(f"❌ Token 連線異常: {str(e)}")
+            logger.exception("TDX token request failed error_type=%s", type(e).__name__)
             return None
 
     def sync_all_data_safely(self):
@@ -62,14 +68,16 @@ class TDXToMySQL:
             logger.info(f"📡 正在嘗試連線至 MySQL 主機: {self.db_config['host']} (已啟用 SSL 加密防護)...")
             conn = pymysql.connect(**self.db_config)
             cursor = conn.cursor()
+            logger.info("TDX sync database connection succeeded")
         except Exception as e:
-            logger.error(f"❌ 資料庫連線失敗: {str(e)}")
+            logger.exception("TDX sync database connection failed error_type=%s", type(e).__name__)
             return
 
         try:
             logger.warning("🚨 正在執行 TRUNCATE TABLE... 清空 attractions 表內舊資料...")
             cursor.execute("TRUNCATE TABLE attractions")
             conn.commit()
+            logger.info("TDX sync attractions table cleared")
             logger.info("🧹 資料表已成功清空！準備以最安全的慢速爬取全台數據...")
         except Exception as e:
             logger.error(f"❌ 清空資料表失敗: {str(e)}")
@@ -90,6 +98,7 @@ class TDXToMySQL:
         total_inserted = 0
         consecutive_429_count = 0
         base_backoff = 10.0 
+        sync_completed = False
 
         sql = """
             INSERT INTO attractions (title, category, city, address, description, tel)
@@ -104,6 +113,8 @@ class TDXToMySQL:
             }
             
             try:
+                page_started_at = time.perf_counter()
+                logger.info("TDX page request started skip=%d top=%d", skip_count, page_size)
                 res = requests.get(base_url, headers=headers, params=query_params, timeout=20)  # 分頁筆數變大，拉長 timeout 避免誤判逾時
                 
                 if res.status_code == 429:
@@ -118,14 +129,22 @@ class TDXToMySQL:
                     continue
                 
                 if res.status_code != 200:
-                    logger.error(f"TDX 伺服器回傳錯誤 ({res.status_code})，跳出。內容: {res.text}")
+                    logger.error("TDX page request failed status_code=%d", res.status_code)
                     break
 
                 consecutive_429_count = 0
                 response_data = res.json()
                 spots_list = response_data.get("value", [])
+                duration_ms = (time.perf_counter() - page_started_at) * 1000
+                logger.info(
+                    "TDX page request succeeded skip=%d result_count=%d duration_ms=%.1f",
+                    skip_count,
+                    len(spots_list),
+                    duration_ms,
+                )
                 
                 if not spots_list:
+                    sync_completed = True
                     break
 
                 # 寫入資料庫
@@ -145,6 +164,7 @@ class TDXToMySQL:
                 logger.info(f"✍️ 寫入進度：已成功塞入全台累計共 {total_inserted} 筆景點資料...")
 
                 if len(spots_list) < page_size:
+                    sync_completed = True
                     break
                     
                 skip_count += page_size
@@ -153,13 +173,16 @@ class TDXToMySQL:
                 time.sleep(5.0)
 
             except Exception as e:
-                logger.error(f" 全量同步過程中發生異常: {str(e)}")
+                logger.exception("TDX sync page failed skip=%d error_type=%s", skip_count, type(e).__name__)
                 conn.rollback()
                 break
 
         cursor.close()
         conn.close()
-        logger.info(f"全台灣共計 {total_inserted} 筆官方即時景點數據已全數安全、穩健地寫入 MySQL！")
+        if sync_completed:
+            logger.info("TDX sync completed inserted_count=%d", total_inserted)
+        else:
+            logger.error("TDX sync stopped before completion inserted_count=%d", total_inserted)
 
 if __name__ == "__main__":
     sync_engine = TDXToMySQL()

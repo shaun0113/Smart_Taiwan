@@ -1,10 +1,14 @@
 import os
+import logging
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Any
 
 import pymysql
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env", override=True)
@@ -73,29 +77,67 @@ def _travel_connection_config() -> Dict[str, Any]:
 
 
 @contextmanager
-def _managed_connection(config: Dict[str, Any]):
-    connection = pymysql.connect(**config)
+def _managed_connection(config: Dict[str, Any], connection_name: str):
+    started_at = time.perf_counter()
+    logger.info("database connection started name=%s", connection_name)
+    try:
+        connection = pymysql.connect(**config)
+    except Exception:
+        duration_ms = (time.perf_counter() - started_at) * 1000
+        logger.exception(
+            "database connection failed name=%s duration_ms=%.1f",
+            connection_name,
+            duration_ms,
+        )
+        raise
+
+    duration_ms = (time.perf_counter() - started_at) * 1000
+    logger.info(
+        "database connection succeeded name=%s duration_ms=%.1f",
+        connection_name,
+        duration_ms,
+    )
     try:
         yield connection
         connection.commit()
+        logger.info("database transaction committed name=%s", connection_name)
     except Exception:
         connection.rollback()
+        logger.exception(
+            "database transaction failed and rolled back name=%s",
+            connection_name,
+        )
         raise
     finally:
         connection.close()
+        logger.info("database connection closed name=%s", connection_name)
 
 
 @contextmanager
 def get_auth_db():
     """取得 Railway 帳號資料庫連線。"""
-    with _managed_connection(_auth_connection_config()) as connection:
+    logger.info("database configuration started name=auth")
+    try:
+        config = _auth_connection_config()
+    except Exception:
+        logger.exception("database configuration failed name=auth")
+        raise
+    logger.info("database configuration completed name=auth")
+    with _managed_connection(config, "auth") as connection:
         yield connection
 
 
 @contextmanager
 def get_travel_db():
     """取得 Aiven 旅遊資料庫連線。"""
-    with _managed_connection(_travel_connection_config()) as connection:
+    logger.info("database configuration started name=travel")
+    try:
+        config = _travel_connection_config()
+    except Exception:
+        logger.exception("database configuration failed name=travel")
+        raise
+    logger.info("database configuration completed name=travel")
+    with _managed_connection(config, "travel") as connection:
         yield connection
 
 
