@@ -56,6 +56,24 @@ class SmartTourEngine:
                 message = message.replace(api_key, "[REDACTED]")
         return f"{type(error).__name__}: {message[:300]}"
 
+    def _log_gemini_response(self, operation: str, response_text: str) -> None:
+        enabled = os.getenv("LOG_GEMINI_RESPONSES", "false").strip().lower() in {
+            "1", "true", "yes", "on"
+        }
+        if not enabled:
+            return
+
+        safe_text = response_text
+        for api_key in self.api_keys:
+            if api_key:
+                safe_text = safe_text.replace(api_key, "[REDACTED]")
+        logger.info(
+            "Gemini response start operation=%s\n%s\nGemini response end operation=%s",
+            operation,
+            safe_text,
+            operation,
+        )
+
     def _query_spots_from_db(self, cities: list) -> list:
         logger.info("attractions query started city_count=%d", len(cities))
         try:
@@ -144,6 +162,25 @@ class SmartTourEngine:
                     )
                 )
                 if response.text:
+                    self._log_gemini_response("recommend_spots", response.text)
+                    output_lines = [line.strip() for line in response.text.splitlines() if line.strip()]
+                    structured_rows = sum(
+                        1
+                        for line in output_lines
+                        if len(line.split("|")) >= 3 and line.split("|", 1)[0].strip().isdigit()
+                    )
+                    candidates = getattr(response, "candidates", None) or []
+                    finish_reason = getattr(candidates[0], "finish_reason", "unknown") if candidates else "unknown"
+                    usage = getattr(response, "usage_metadata", None)
+                    output_tokens = getattr(usage, "candidates_token_count", "unknown")
+                    logger.info(
+                        "Gemini operation=recommend_spots output_chars=%d output_lines=%d structured_rows=%d finish_reason=%s output_tokens=%s",
+                        len(response.text),
+                        len(output_lines),
+                        structured_rows,
+                        finish_reason,
+                        output_tokens,
+                    )
                     duration_ms = (time.perf_counter() - started_at) * 1000
                     logger.info(
                         "Gemini operation=recommend_spots succeeded attempt=%d duration_ms=%.1f",
@@ -203,6 +240,7 @@ class SmartTourEngine:
                     contents=guardrail_prompt,
                     config=types.GenerateContentConfig(response_mime_type="application/json")
                 )
+                self._log_gemini_response("analyze_selection", response.text or "")
                 result = json.loads(response.text.strip())
                 duration_ms = (time.perf_counter() - started_at) * 1000
                 logger.info(
@@ -258,6 +296,7 @@ class SmartTourEngine:
                 client = genai.Client(api_key=key)
                 response = client.models.generate_content(model=self.model_name, contents=prompt)
                 if response.text:
+                    self._log_gemini_response("generate_final_itinerary", response.text)
                     duration_ms = (time.perf_counter() - started_at) * 1000
                     logger.info(
                         "Gemini operation=generate_final_itinerary succeeded attempt=%d duration_ms=%.1f",
@@ -301,6 +340,7 @@ class SmartTourEngine:
                 client = genai.Client(api_key=key)
                 response = client.models.generate_content(model=self.model_name, contents=prompt)
                 if response.text:
+                    self._log_gemini_response("modify_itinerary", response.text)
                     duration_ms = (time.perf_counter() - started_at) * 1000
                     logger.info(
                         "Gemini operation=modify_itinerary succeeded attempt=%d duration_ms=%.1f",

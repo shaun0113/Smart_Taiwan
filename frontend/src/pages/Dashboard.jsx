@@ -336,16 +336,16 @@ export const Dashboard = ({ user, onLogout }) => {
       const trimmed = line.trim();
       if (!trimmed) return;
       const parts = trimmed.split('|');
-      if (parts[0] === '1' && parts.length >= 3) {
+      if (/^\d+$/.test(parts[0].trim()) && parts.length >= 3) {
         const title = parts[1].trim().replace(/[\*#_`📍🐾]/g, '');
         const location = parts.length >= 4 ? parts[2].trim() : title;
-        const desc = parts.length >= 4 ? parts[3].trim() : parts[2].trim();
+        const desc = parts.length >= 4 ? parts.slice(3).join('|').trim() : parts.slice(2).join('|').trim();
         if (title && title.length >= 2 && title.length < 30) {
           parsedSpots.push({ title: title, rawMarkdown: `📍 **地點**：${location}\n\n💡 ${desc}` });
         }
       }
     });
-    if (parsedSpots.length >= 3) return parsedSpots.slice(0, 100);
+    if (parsedSpots.length > 0) return parsedSpots.slice(0, 100);
     let tempTitle = "";
     let tempDesc = "";
     lines.forEach(line => {
