@@ -67,7 +67,7 @@ export default function Home({ onStart }) {
               <div className="kicker"><span className="kicker-dot" />畢業專題 · AI 旅遊規劃系統</div>
               <h1><span className="fixed-title-line">每一趟旅程，</span><br /><span className="fixed-title-line"><em>都值得</em>被好好安排。</span></h1>
               <p className="hero-lede">不用苦想怎麼問，也不用在錯誤資訊裡迷路。智遊台灣，把你的旅遊想法整理成一趟真正走得通的旅程。</p>
-              <div className="hero-actions"><a className="primary-button" href="#how">看看它怎麼做到 <ArrowDownRight size={18} /></a><button className="ghost-button" onClick={start}>登入開始規劃 <ChevronRight size={17} /></button></div>
+              <div className="hero-actions"><a className="primary-button" href="#why">看看它怎麼做到 <ArrowDownRight size={18} /></a><button className="ghost-button" onClick={start}>登入開始規劃 <ChevronRight size={17} /></button></div>
               <div className="hero-note"><Sparkles size={15} />讓旅遊新手，也能做出專業領隊等級的規劃</div>
             </div>
             <div className="hero-visual" aria-label="行程規劃預覽示意">
