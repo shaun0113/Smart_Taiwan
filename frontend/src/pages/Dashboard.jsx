@@ -2055,12 +2055,21 @@ export const Dashboard = ({ user, onLogout }) => {
                             </div>
                           ) : sharedItineraries.length > 0 ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {sharedItineraries.map(item => (
-                                <div key={item.id} className="p-3 rounded-xl border border-emerald-100 bg-emerald-50/50 flex flex-col gap-2">
-                                  <span className="text-xs font-black text-emerald-700 truncate">{item.title}</span>
-                                  <button type="button" onClick={() => openSharedPreview(item)} className="text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg py-1.5 transition-colors">查看行程</button>
-                                </div>
-                              ))}
+                              {sharedItineraries.map(item => {
+                                const cities = (item.city || '').split(',').map(city => city.trim()).filter(Boolean);
+                                return (
+                                  <div key={item.id} className="p-3 rounded-xl border border-emerald-100 bg-emerald-50/50 flex flex-col gap-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-[11px] font-bold text-emerald-700 truncate" title={cities.join('、')}>
+                                        {cities.join('、') || '未標示目的地'}
+                                      </span>
+                                      {cities.length > 1 && <span className="shrink-0 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">跨縣市</span>}
+                                    </div>
+                                    <span className="text-xs font-black text-slate-700 truncate" title={item.title}>{item.title}</span>
+                                    <button type="button" onClick={() => openSharedPreview(item)} className="text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg py-1.5 transition-colors">查看行程</button>
+                                  </div>
+                                );
+                              })}
                             </div>
                           ) : (
                             <p className="text-[11px] text-slate-400">目前尚無符合此目的地的分享行程。</p>
